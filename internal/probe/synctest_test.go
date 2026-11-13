@@ -73,3 +73,44 @@ func TestAttemptTimeoutIsVirtual(t *testing.T) {
 		}
 	})
 }
+
+// TestDispatchStopsAtTheRunDeadline pins what happens when the deadline
+// expires while the pool is full. The dispatch loop must stop handing out
+// work, mark the instances it never started as unknown, and wait only for
+// what is already in flight. Otherwise a permit released by an in-flight probe
+// lets the loop start another one whose budget is already spent.
+func TestDispatchStopsAtTheRunDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var dials atomic.Int32
+		runner := New(&Options{
+			Concurrency: 1,
+			Timeout:     5 * time.Second,
+			Deadline:    100 * time.Millisecond,
+			RetryDelay:  time.Millisecond,
+			Dialer: dialFunc(func(ctx context.Context, _, _ string) (net.Conn, error) {
+				dials.Add(1)
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}),
+		})
+		start := time.Now()
+		obs := runner.Run(context.Background(), []Instance{
+			{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+			{Host: "box", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+			{Host: "apiary", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+		})
+		elapsed := time.Since(start)
+
+		if elapsed != 100*time.Millisecond {
+			t.Fatalf("run took %v, want exactly the deadline", elapsed)
+		}
+		if got := dials.Load(); got != 1 {
+			t.Fatalf("dialled %d instances, want only the one that was in flight when the deadline hit", got)
+		}
+		for i, o := range obs {
+			if o.Result != contract.ResultUnknown {
+				t.Fatalf("observation %d: got %s, want unknown once the run is over", i, o.Result)
+			}
+		}
+	})
+}
