@@ -33,4 +33,4 @@ holds:
   - host: tower              # host slug or "*"
     kind: ts_reach           # kind or "*"
     reason: planned maintenance
-    until: 2026-12-01T00:00:00Z   # RFC 3339
+    until: "2026-12-01T00:00:00Z"   # RFC 3339
