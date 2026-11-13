@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -129,23 +128,6 @@ func runValidate(f *validateFlags, deps *Deps, stdout, stderr io.Writer) error {
 		}
 	}
 	return nil
-}
-
-// resolveOverlayPath repeats the overlay resolution order the check
-// command uses: --overlay, then $SIMPLEX_OVERLAY, then
-// simplex.overlay.yaml when it exists. An empty result means no overlay
-// path was resolved at all.
-func resolveOverlayPath(flag string, getenv func(string) string) string {
-	path := flag
-	if path == "" && getenv != nil {
-		path = getenv(overlayEnv)
-	}
-	if path == "" {
-		if _, err := os.Stat(defaultOverlay); err == nil {
-			path = defaultOverlay
-		}
-	}
-	return path
 }
 
 // overlayFindings flattens an overlay failure into the shared finding
