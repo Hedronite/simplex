@@ -1,0 +1,134 @@
+# HELP simplex_build_info Build information for this binary.
+# TYPE simplex_build_info gauge
+simplex_build_info{version="0.0.0-dev",commit="unknown"} 1
+# HELP simplex_overall_severity Worst severity of the last completed run: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_overall_severity gauge
+simplex_overall_severity 0
+# HELP simplex_vantage_status One-hot vantage status of the last completed run.
+# TYPE simplex_vantage_status gauge
+simplex_vantage_status{status="ok"} 1
+simplex_vantage_status{status="blind"} 0
+simplex_vantage_status{status="unchecked"} 0
+# HELP simplex_host_severity Severity of one host: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_host_severity gauge
+simplex_host_severity{host="box"} 0
+simplex_host_severity{host="lathe"} 0
+simplex_host_severity{host="tower"} 0
+# HELP simplex_check_severity Severity of one check instance: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_check_severity gauge
+simplex_check_severity{host="box",kind="prom_up",target=":9090/-/ready"} 0
+simplex_check_severity{host="lathe",kind="prom_up",target=":9090/-/ready"} 0
+simplex_check_severity{host="tower",kind="kube_apiserver",target=":6443"} 0
+simplex_check_severity{host="tower",kind="node_exporter",target=":9100/metrics"} 0
+simplex_check_severity{host="tower",kind="ts_reach",target=":9100"} 0
+# HELP simplex_check_result One-hot probe result of one check instance.
+# TYPE simplex_check_result gauge
+simplex_check_result{host="box",kind="prom_up",target=":9090/-/ready",result="up"} 1
+simplex_check_result{host="box",kind="prom_up",target=":9090/-/ready",result="down"} 0
+simplex_check_result{host="box",kind="prom_up",target=":9090/-/ready",result="unknown"} 0
+simplex_check_result{host="lathe",kind="prom_up",target=":9090/-/ready",result="up"} 1
+simplex_check_result{host="lathe",kind="prom_up",target=":9090/-/ready",result="down"} 0
+simplex_check_result{host="lathe",kind="prom_up",target=":9090/-/ready",result="unknown"} 0
+simplex_check_result{host="tower",kind="kube_apiserver",target=":6443",result="up"} 0
+simplex_check_result{host="tower",kind="kube_apiserver",target=":6443",result="down"} 1
+simplex_check_result{host="tower",kind="kube_apiserver",target=":6443",result="unknown"} 0
+simplex_check_result{host="tower",kind="node_exporter",target=":9100/metrics",result="up"} 1
+simplex_check_result{host="tower",kind="node_exporter",target=":9100/metrics",result="down"} 0
+simplex_check_result{host="tower",kind="node_exporter",target=":9100/metrics",result="unknown"} 0
+simplex_check_result{host="tower",kind="ts_reach",target=":9100",result="up"} 1
+simplex_check_result{host="tower",kind="ts_reach",target=":9100",result="down"} 0
+simplex_check_result{host="tower",kind="ts_reach",target=":9100",result="unknown"} 0
+# HELP simplex_check_reason One series per frozen reason code, 1 when the check carries it.
+# TYPE simplex_check_reason gauge
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_ok"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_refused"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_timeout"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="http_timeout"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="http_unexpected_status"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="prom_not_ready"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="prom_auth"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="metrics_body_unexpected"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="expected_dark"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="unexpected_light"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="unexpected_dark"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="held"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="probe_unknown"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="prom_pair_down"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="prom_pair_degraded"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="vantage_blind"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_ok"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_refused"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_timeout"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="http_timeout"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="http_unexpected_status"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="prom_not_ready"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="prom_auth"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="metrics_body_unexpected"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="expected_dark"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="unexpected_light"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="unexpected_dark"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="held"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="probe_unknown"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="prom_pair_down"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="prom_pair_degraded"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="vantage_blind"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="tcp_connect_ok"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="tcp_connect_refused"} 1
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="tcp_connect_timeout"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="http_timeout"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="http_unexpected_status"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_not_ready"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_auth"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="metrics_body_unexpected"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="expected_dark"} 1
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="unexpected_light"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="unexpected_dark"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="held"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="probe_unknown"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_pair_down"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_pair_degraded"} 0
+simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="vantage_blind"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="tcp_connect_ok"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="tcp_connect_refused"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="tcp_connect_timeout"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="http_timeout"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="http_unexpected_status"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="prom_not_ready"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="prom_auth"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="metrics_body_unexpected"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="expected_dark"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="unexpected_light"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="unexpected_dark"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="held"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="probe_unknown"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="prom_pair_down"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="prom_pair_degraded"} 0
+simplex_check_reason{host="tower",kind="node_exporter",target=":9100/metrics",reason="vantage_blind"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="tcp_connect_ok"} 1
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="tcp_connect_refused"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="tcp_connect_timeout"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="http_timeout"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="http_unexpected_status"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="prom_not_ready"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="prom_auth"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="metrics_body_unexpected"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="expected_dark"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="unexpected_light"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="unexpected_dark"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="held"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="probe_unknown"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="prom_pair_down"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="prom_pair_degraded"} 0
+simplex_check_reason{host="tower",kind="ts_reach",target=":9100",reason="vantage_blind"} 0
+# HELP simplex_last_run_timestamp_seconds End of the last completed run, in Unix seconds.
+# TYPE simplex_last_run_timestamp_seconds gauge
+simplex_last_run_timestamp_seconds 1794592802
+# HELP simplex_document_age_seconds Age of the served document, computed at scrape.
+# TYPE simplex_document_age_seconds gauge
+simplex_document_age_seconds 12
+# HELP simplex_run_duration_seconds Duration of the last completed run, in seconds.
+# TYPE simplex_run_duration_seconds gauge
+simplex_run_duration_seconds 1.5
+# HELP simplex_run_errors_total Runs that produced no document.
+# TYPE simplex_run_errors_total counter
+simplex_run_errors_total 3
