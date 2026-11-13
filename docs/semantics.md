@@ -76,7 +76,7 @@ An **outcome** code says what the probe saw. A **verdict** code says why the sev
 Evaluated per check, in this order. The first rule that matches decides the severity; outcome codes from the probe are always kept.
 
 1. **Blind vantage:** result `unknown`, severity RED, reasons `[vantage_blind]`. Terminal: it ends evaluation for the check, overrides holds and expected-dark, and the pair pass (rule 5) is skipped under a blind vantage. A blind check carries only `vantage_blind`.
-2. **Held** (an unexpired hold matches host and kind): severity GREEN, reasons gain `held`, whatever the result. The check still runs and reports its real result.
+2. **Held** (an unexpired hold matches host and kind): severity GREEN, reasons gain `held`, whatever the result. The check still runs and reports its real result. A hold is live only while its `until` is strictly after the run clock (`--now`, or the system clock); `until` at or before the clock is expired, the hold is ignored, and `validate` warns.
 3. **Expected dark:** not up gives GREEN `expected_dark`. Up gives YELLOW `unexpected_light`. The prom status map does not apply here.
 4. **Expected light:**
    - up: GREEN. The outcome codes `prom_not_ready`, `prom_auth` and `metrics_body_unexpected` raise it to YELLOW; they refine the `up` and add no verdict code.
