@@ -1,0 +1,8 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+pot: 1
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}

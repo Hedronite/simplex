@@ -1,0 +1,7 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+hosts:
+  - id: box
+    checks:
+      - {kind: prom_up, expected: light}

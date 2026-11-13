@@ -1,0 +1,6 @@
+vantage:
+  id: lathe
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}
