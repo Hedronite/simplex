@@ -207,7 +207,8 @@ Flags:
 
 The real exposition from `example.yaml`, run from a machine with no route to
 the mesh (excerpt; the full output has one severity, three one-hot result and
-sixteen one-hot reason series per check):
+sixteen one-hot reason series per check). The help block above is the whole
+output of `serve --help`, checksum-matched to the built binary:
 
 ```console
 $ curl -s http://127.0.0.1:10081/metrics
