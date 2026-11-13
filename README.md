@@ -175,17 +175,20 @@ logged on every start: `/metrics` has no authentication.
 $ simplex serve --help
 Run a probe pass every --interval and serve the latest result as
 Prometheus metrics on GET /metrics.
+
 Each pass produces one snapshot; /metrics and --out are built from the same
 one. With --out, serve is the writer of record for the document file: the
 snapshot is written every interval by temp file, fsync and atomic rename.
+
 serve binds loopback only. A non-loopback --listen is refused unless
 --unsafe-allow-non-loopback is set, and then a warning is printed on every start:
 /metrics has no authentication.
+
 A failing pass after startup is counted (simplex_run_errors_total) and logged
 by field path only, and the last good snapshot stays; serve never exits on
 severity. SIGINT or SIGTERM finishes the pass in flight and exits 0.
+
 Exit codes: 0 normal stop, 3 config or usage error at startup, 4 the address
-cannot be bound or the server fails.
 ```
 
 The real exposition from `example.yaml`, run from a machine with no route to
