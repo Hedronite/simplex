@@ -457,3 +457,63 @@ func TestTimeoutIsClamped(t *testing.T) {
 		t.Fatal("Default returned nil")
 	}
 }
+
+// TestNodeExporterFailures covers the node_exporter cases a status-only table
+// cannot express: a refused connection and a response that never arrives.
+func TestNodeExporterFailures(t *testing.T) {
+	closed, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen closed: %v", err)
+	}
+	_, closedPortStr, _ := net.SplitHostPort(closed.Addr().String())
+	closedPort, _ := strconv.Atoi(closedPortStr)
+	_ = closed.Close()
+
+	t.Run("refused is down", func(t *testing.T) {
+		obs := New(&Options{RetryDelay: time.Millisecond}).Run(context.Background(), []Instance{{
+			Host: "tower", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+			Address: "127.0.0.1", Port: closedPort, Path: contract.PathMetrics,
+		}})
+		if obs[0].Result != contract.ResultDown || obs[0].Outcome != contract.ReasonTCPConnectRefused {
+			t.Fatalf("got (%s, %q), want (down, tcp_connect_refused)", obs[0].Result, obs[0].Outcome)
+		}
+	})
+
+	t.Run("no response is unknown and retried", func(t *testing.T) {
+		var requests atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests.Add(1)
+			time.Sleep(300 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+		host, port := resolveStarted(t, srv)
+
+		obs := New(&Options{Timeout: 50 * time.Millisecond, RetryDelay: 10 * time.Millisecond}).
+			Run(context.Background(), []Instance{{
+				Host: "tower", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+				Address: host, Port: port, Path: contract.PathMetrics,
+			}})
+		if obs[0].Result != contract.ResultUnknown || obs[0].Outcome != contract.ReasonHTTPTimeout {
+			t.Fatalf("got (%s, %q), want (unknown, http_timeout)", obs[0].Result, obs[0].Outcome)
+		}
+		if got := requests.Load(); got != 2 {
+			t.Fatalf("the server saw %d requests, want one attempt and one retry", got)
+		}
+	})
+
+	t.Run("5xx is down", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer srv.Close()
+		host, port := resolveStarted(t, srv)
+		obs := New(&Options{}).Run(context.Background(), []Instance{{
+			Host: "tower", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+			Address: host, Port: port, Path: contract.PathMetrics,
+		}})
+		if obs[0].Result != contract.ResultDown || obs[0].Outcome != contract.ReasonHTTPUnexpectedStatus {
+			t.Fatalf("got (%s, %q), want (down, http_unexpected_status)", obs[0].Result, obs[0].Outcome)
+		}
+	})
+}
