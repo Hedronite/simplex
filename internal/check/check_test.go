@@ -14,16 +14,13 @@ import (
 
 var runNow = time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
 
-// The sentinels are assembled from parts so the tracked tree holds no address
-// or hostname literal; fixtures below use the @IP@, @IP2@ and @HOST@ markers.
-var (
-	secretIP   = strings.Join([]string{"10", "9", "8", "7"}, ".")
-	secretIP2  = strings.Join([]string{"10", "1", "2", "3"}, ".")
-	secretHost = strings.Join([]string{"box", "tail1234", "ts", "net"}, ".")
-	fillValues = strings.NewReplacer("@IP@", secretIP, "@IP2@", secretIP2, "@HOST@", secretHost)
+// Sentinels are reserved documentation values written as plain literals:
+// TEST-NET addresses and a name under .example (RFC 2606). They are visible to
+// the tree scrub, which only warns on them, and can never be real values.
+const (
+	secretIP   = "192.0.2.77"
+	secretHost = "box.tail.example"
 )
-
-func fill(s string) string { return fillValues.Replace(s) }
 
 func write(t *testing.T, dir, name, body string) string {
 	t.Helper()
@@ -46,9 +43,9 @@ func TestFieldsNeverRepeatPrivateValues(t *testing.T) {
 	dir := t.TempDir()
 	cfg := write(t, dir, "c.yaml", goodConfig)
 	for name, overlayText := range map[string]string{
-		"address as a top-level key": fill("apiVersion: simplex.overlay/v0\n@IP@: x\nhosts:\n  tower:\n    address: placeholder.invalid\n"),
-		"address as a host key":      fill("apiVersion: simplex.overlay/v0\nhosts:\n  @IP@:\n    address: placeholder.invalid\n"),
-		"hostname as an extra key":   fill("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: placeholder.invalid\n    @HOST@: y\n"),
+		"address as a top-level key": "apiVersion: simplex.overlay/v0\n192.0.2.77: x\nhosts:\n  tower:\n    address: placeholder.invalid\n",
+		"address as a host key":      "apiVersion: simplex.overlay/v0\nhosts:\n  192.0.2.77:\n    address: placeholder.invalid\n",
+		"hostname as an extra key":   "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: placeholder.invalid\n    box.tail.example: y\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			ov := write(t, dir, "o-"+strings.ReplaceAll(name, " ", "-")+".txt", overlayText)
@@ -85,7 +82,7 @@ func TestFieldsKeepRealFieldPaths(t *testing.T) {
 
 func TestSafePath(t *testing.T) {
 	keep := []string{"", "hosts", "hosts[0].checks[1].path", "vantage.canaries[0].host", "hosts.tower.address", "hosts.tower.overrides[0].kind", "apiVersion"}
-	drop := []string{secretIP, secretHost, "hosts.Tower", "hosts." + secretIP2 + ".address", "weird key", "hosts[x].id", "hosts[0"}
+	drop := []string{secretIP, secretHost, "hosts.Tower", "hosts.198.51.100.9.address", "weird key", "hosts[x].id", "hosts[0"}
 	for _, p := range keep {
 		if safePath(p) != p {
 			t.Errorf("safePath(%q) dropped a real field path", p)
