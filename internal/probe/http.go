@@ -23,7 +23,7 @@ var buildInfoSeries = []byte("prometheus_build_info")
 // sharedTransport is reused across runs so a serve loop keeps its sockets.
 var sharedTransport = &http.Transport{
 	Proxy:                 nil,
-	DialContext:           (&net.Dialer{Timeout: MaxTimeout, KeepAlive: 30 * time.Second}).DialContext,
+	DialContext:           guardedDialContext,
 	MaxIdleConns:          4,
 	MaxIdleConnsPerHost:   1,
 	IdleConnTimeout:       90 * time.Second,
@@ -36,6 +36,19 @@ var (
 	sharedClientOnce sync.Once
 	sharedClient     *http.Client
 )
+
+// guardedDialContext is the TCP path's refusal applied to the shared HTTP
+// transport, so a request that somehow names the denied port still cannot
+// leave the process.
+func guardedDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	if _, portStr, err := net.SplitHostPort(address); err == nil {
+		if port, err := strconv.Atoi(portStr); err == nil && port == contract.DeniedPort {
+			return nil, errDeniedPort
+		}
+	}
+	d := net.Dialer{Timeout: MaxTimeout, KeepAlive: 30 * time.Second}
+	return d.DialContext(ctx, network, address)
+}
 
 // client returns the client for this run. Redirects are never followed: a
 // probe answers for the path it named, not for wherever it is sent. The client
@@ -60,6 +73,11 @@ func noRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastRe
 // prom_not_ready, and one that answers 401 is up with prom_auth: the service is
 // alive and misconfigured, which is a different fact from being down.
 func (o *Options) probeHTTP(ctx context.Context, inst *Instance) (contract.Result, contract.Reason, bool) {
+	if inst.Port == contract.DeniedPort {
+		// The same refusal as the TCP path, so no kind can route around it,
+		// whichever transport a caller supplied.
+		return contract.ResultUnknown, "", false
+	}
 	path := inst.Path
 	if path == "" {
 		switch inst.Kind {
@@ -88,7 +106,7 @@ func (o *Options) probeHTTP(ctx context.Context, inst *Instance) (contract.Resul
 	if bodyErr != nil {
 		return classifyHTTPError(bodyErr)
 	}
-	return classifyStatus(resp.StatusCode, checkBody, readyPath, hasBuildInfo)
+	return classifyStatus(inst.Kind, resp.StatusCode, checkBody, readyPath, hasBuildInfo)
 }
 
 // url builds the request target. The address is used only here: it never
@@ -122,19 +140,22 @@ func readBuildInfo(body io.Reader, wantSeries bool) (bool, error) {
 }
 
 // classifyStatus applies semantics section 3 to a response.
-func classifyStatus(status int, checkBody, readyPath, hasBuildInfo bool) (contract.Result, contract.Reason, bool) {
+//
+// Two codes are kind-scoped: prom_not_ready means a readiness path answered
+// 503 by design, and prom_auth means a Prometheus is alive but refusing. Both
+// belong to prom_up only; on any other kind those statuses are simply not the
+// expected answer, so they are down with http_unexpected_status.
+func classifyStatus(kind contract.Kind, status int, checkBody, readyPath, hasBuildInfo bool) (contract.Result, contract.Reason, bool) {
 	switch {
 	case status == http.StatusOK:
 		if checkBody && !hasBuildInfo {
 			return contract.ResultUp, contract.ReasonMetricsBodyBad, false
 		}
 		return contract.ResultUp, "", false
-	case status == http.StatusServiceUnavailable && readyPath:
+	case status == http.StatusServiceUnavailable && readyPath && kind == contract.KindPromUp:
 		// The process answered, so it is up; it just cannot take traffic yet.
 		return contract.ResultUp, contract.ReasonPromNotReady, false
-	case status == http.StatusServiceUnavailable:
-		return contract.ResultDown, contract.ReasonHTTPUnexpectedStatus, false
-	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+	case (status == http.StatusUnauthorized || status == http.StatusForbidden) && kind == contract.KindPromUp:
 		return contract.ResultUp, contract.ReasonPromAuth, false
 	default:
 		return contract.ResultDown, contract.ReasonHTTPUnexpectedStatus, false

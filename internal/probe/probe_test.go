@@ -63,8 +63,14 @@ func TestHTTPStatusMap(t *testing.T) {
 		{"node exporter has no build info assertion", contract.KindNodeExporter, contract.PathMetrics, 200, "node_exporter_build_info 1\n", contract.ResultUp, ""},
 		{"ready 503 is up but not ready", contract.KindPromUp, contract.PathReady, 503, "not ready\n", contract.ResultUp, contract.ReasonPromNotReady},
 		{"healthy 503 is an unexpected status", contract.KindPromUp, contract.PathHealthy, 503, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
-		{"401", contract.KindPromUp, contract.PathReady, 401, "no\n", contract.ResultUp, contract.ReasonPromAuth},
-		{"403", contract.KindPromUp, contract.PathReady, 403, "no\n", contract.ResultUp, contract.ReasonPromAuth},
+		{"prom 401", contract.KindPromUp, contract.PathReady, 401, "no\n", contract.ResultUp, contract.ReasonPromAuth},
+		{"prom 403", contract.KindPromUp, contract.PathReady, 403, "no\n", contract.ResultUp, contract.ReasonPromAuth},
+		// prom_auth belongs to prom_up alone: on any other kind these statuses
+		// are simply not the answer the check expects.
+		{"node exporter 401", contract.KindNodeExporter, contract.PathMetrics, 401, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
+		{"node exporter 403", contract.KindNodeExporter, contract.PathMetrics, 403, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
+		{"node exporter 503", contract.KindNodeExporter, contract.PathMetrics, 503, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
+		{"node exporter 404", contract.KindNodeExporter, contract.PathMetrics, 404, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
 		{"404", contract.KindPromUp, contract.PathReady, 404, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
 		{"500", contract.KindPromUp, contract.PathReady, 500, "no\n", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus},
 	}
@@ -300,6 +306,36 @@ func TestDialOutcomes(t *testing.T) {
 				t.Fatalf("dialled %d times, want %d", got, tc.dials)
 			}
 		})
+	}
+}
+
+// TestDeniedPortIsRefusedOnTheHTTPPath drives probeHTTP directly, past Run, to
+// prove the refusal is in the probe and not only in the runner's loop: a
+// caller that reaches the HTTP path with the denied port must not produce a
+// request at all, whichever transport it supplied.
+func TestDeniedPortIsRefusedOnTheHTTPPath(t *testing.T) {
+	var requests atomic.Int32
+	seam := roundTripFunc(func(*http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: http.Header{}}, nil
+	})
+	opts := Options{Transport: seam}
+	opts.withDefaults()
+
+	result, outcome, retried := opts.probeHTTP(context.Background(), &Instance{
+		Host: "box", Kind: contract.KindPromUp, Target: ":" + strconv.Itoa(contract.DeniedPort) + contract.PathReady,
+		Address: "placeholder.invalid", Port: contract.DeniedPort, Path: contract.PathReady,
+	})
+	if requests.Load() != 0 {
+		t.Fatalf("the denied port produced %d requests", requests.Load())
+	}
+	if result != contract.ResultUnknown || outcome != "" || retried {
+		t.Fatalf("got (%s, %q, retried=%v), want unknown, no outcome, no retry", result, outcome, retried)
+	}
+
+	// The shared transport refuses it too, in case anything else drives it.
+	if _, err := guardedDialContext(context.Background(), "tcp", net.JoinHostPort("placeholder.invalid", strconv.Itoa(contract.DeniedPort))); !errors.Is(err, errDeniedPort) {
+		t.Fatalf("guardedDialContext returned %v, want errDeniedPort", err)
 	}
 }
 

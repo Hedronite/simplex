@@ -19,10 +19,10 @@ func no(context.Context) bool  { return false }
 
 func TestStatuses(t *testing.T) {
 	cases := []struct {
-		name     string
-		local    bool
-		canaries []Canary
-		want     contract.VantageStatus
+		name      string
+		onTailnet bool
+		canaries  []Canary
+		want      contract.VantageStatus
 	}{
 		{"no local address is blind even with canaries", false, []Canary{yes}, contract.VantageBlind},
 		{"no local address and no canaries is blind", false, nil, contract.VantageBlind},
@@ -33,7 +33,7 @@ func TestStatuses(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := New(Options{Lister: fixedLister(tc.local), Canaries: tc.canaries}).Status(context.Background())
+			got := New(Options{Lister: fixedLister(tc.onTailnet), Canaries: tc.canaries}).Status(context.Background())
 			if got != tc.want {
 				t.Fatalf("got %s, want %s", got, tc.want)
 			}
@@ -69,21 +69,25 @@ func TestNewFillsTheRealLister(t *testing.T) {
 
 func TestIsTailnetAddress(t *testing.T) {
 	cases := []struct {
-		addr string
+		name string
+		ip   net.IP
 		want bool
 	}{
-		{"100.64.0.1", true},
-		{"100.127.255.255", true},
-		{"100.63.255.255", false},
-		{"100.128.0.0", false},
-		{"100.64.0.0", true},
-		{"192.0.2.1", false},
-		{"127.0.0.1", false},
-		{"::1", false},
+		// First and last address of the RFC 6598 range, then one outside on
+		// each side.
+		{"first address in range", net.IPv4(100, 64, 0, 1), true},
+		{"last address in range", net.IPv4(100, 127, 255, 255), true},
+		{"network address itself", net.IPv4(100, 64, 0, 0), true},
+		{"one below the range", net.IPv4(100, 63, 255, 255), false},
+		{"one above the range", net.IPv4(100, 128, 0, 0), false},
+		{"documentation range", net.IPv4(192, 0, 2, 1), false},
+		{"loopback", net.IPv4(127, 0, 0, 1), false},
+		{"ipv6 loopback", net.ParseIP("::1"), false},
+		{"unspecified", net.IPv4zero, false},
 	}
 	for _, tc := range cases {
-		if got := IsTailnetAddress(net.ParseIP(tc.addr)); got != tc.want {
-			t.Errorf("IsTailnetAddress(%s) = %v, want %v", tc.addr, got, tc.want)
+		if got := IsTailnetAddress(tc.ip); got != tc.want {
+			t.Errorf("IsTailnetAddress(%s) = %v, want %v", tc.name, got, tc.want)
 		}
 	}
 	if IsTailnetAddress(nil) {
