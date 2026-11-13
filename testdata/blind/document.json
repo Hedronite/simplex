@@ -9,8 +9,10 @@
   ],
   "checks": [
     {"host": "box", "kind": "prom_up", "target": ":9090/-/ready", "result": "unknown",
-     "severity": "RED", "expected": "light", "reasons": ["vantage_blind"]},
+     "severity": "RED", "expected": "light",
+     "reasons": ["vantage_blind"]},
     {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "unknown",
-     "severity": "RED", "expected": "light", "reasons": ["vantage_blind"]}
+     "severity": "RED", "expected": "light",
+     "reasons": ["vantage_blind"]}
   ]
 }

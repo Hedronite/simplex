@@ -9,8 +9,10 @@
   ],
   "checks": [
     {"host": "box", "kind": "prom_up", "target": ":9090/metrics", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []},
+     "severity": "GREEN", "expected": "light",
+     "reasons": []},
     {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []}
+     "severity": "GREEN", "expected": "light",
+     "reasons": []}
   ]
 }
