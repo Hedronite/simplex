@@ -7,7 +7,11 @@
 # The private address overlay is never tracked. CI asserts this.
 simplex.overlay.yaml
 *.overlay.yaml
+*.overlay.yml
 *.overlay.json
+overlay.yaml
+overlay.yml
+overlay.json
 .simplex/
 
 # Editor and OS noise
