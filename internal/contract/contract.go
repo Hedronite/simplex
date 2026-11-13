@@ -115,6 +115,10 @@ const (
 	ClassVerdict ReasonClass = "verdict"
 	// ClassBlind marks a check invalidated by a blind vantage.
 	ClassBlind ReasonClass = "blind"
+	// ClassEnrichment codes describe what the local tailnet daemon knows about
+	// the peer of a ts_reach check. They are informational: they never change
+	// a result or a severity.
+	ClassEnrichment ReasonClass = "enrichment"
 )
 
 // Reason codes.
@@ -137,7 +141,27 @@ const (
 	ReasonPromPairDegrade Reason = "prom_pair_degraded"
 
 	ReasonVantageBlind Reason = "vantage_blind"
+
+	// Enrichment codes (S3). At most one per group on a ts_reach check: one of
+	// the peer-state codes and one of the path codes.
+	ReasonTSPeerOnline    Reason = "ts_peer_online"
+	ReasonTSPeerOffline   Reason = "ts_peer_offline"
+	ReasonTSPeerUnmatched Reason = "ts_peer_unmatched"
+	ReasonTSPathDirect    Reason = "ts_path_direct"
+	ReasonTSPathRelayed   Reason = "ts_path_relayed"
 )
+
+// EnrichmentPeerState and EnrichmentPath are the two groups of enrichment
+// codes. A check carries at most one code from each.
+var (
+	EnrichmentPeerState = []Reason{ReasonTSPeerOnline, ReasonTSPeerOffline, ReasonTSPeerUnmatched}
+	EnrichmentPath      = []Reason{ReasonTSPathDirect, ReasonTSPathRelayed}
+)
+
+// DefaultTailscaleSocket is the LocalAPI socket path used when the config
+// enables enrichment without naming one (Linux). The config accepts absolute
+// paths only.
+const DefaultTailscaleSocket = "/var/run/tailscale/tailscaled.sock"
 
 // ReasonSpec ties a reason code to its class.
 type ReasonSpec struct {
@@ -163,6 +187,11 @@ var ReasonSpecs = []ReasonSpec{
 	{ReasonPromPairDown, ClassVerdict},
 	{ReasonPromPairDegrade, ClassVerdict},
 	{ReasonVantageBlind, ClassBlind},
+	{ReasonTSPeerOnline, ClassEnrichment},
+	{ReasonTSPeerOffline, ClassEnrichment},
+	{ReasonTSPeerUnmatched, ClassEnrichment},
+	{ReasonTSPathDirect, ClassEnrichment},
+	{ReasonTSPathRelayed, ClassEnrichment},
 }
 
 // ReasonCodes returns every reason code in documentation order.

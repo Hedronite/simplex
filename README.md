@@ -108,7 +108,7 @@ the full contract):
 }
 ```
 
-Field names and the 16 reason codes are frozen at S0 (see §4 and §13 of
+Field names and the reason codes are frozen (16 at S0, five enrichment codes added at S3) (see §4 and §13 of
 `docs/semantics.md`); changes after S1 are breaking. The check kinds are an open
 enum: adding one is a minor change.
 
@@ -207,7 +207,7 @@ Flags:
 
 The real exposition from `example.yaml`, run from a machine with no route to
 the mesh (excerpt; the full output has one severity, three one-hot result and
-sixteen one-hot reason series per check). The help block above is the whole
+21 one-hot reason series per check). The help block above is the whole
 output of `serve --help`, checksum-matched to the built binary:
 
 ```console
