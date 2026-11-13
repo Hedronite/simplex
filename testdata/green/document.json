@@ -10,14 +10,19 @@
   ],
   "checks": [
     {"host": "box", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []},
+     "severity": "GREEN", "expected": "light",
+     "reasons": []},
     {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []},
+     "severity": "GREEN", "expected": "light",
+     "reasons": []},
     {"host": "tower", "kind": "kube_apiserver", "target": ":6443", "result": "down",
-     "severity": "GREEN", "expected": "dark", "reasons": ["expected_dark", "tcp_connect_refused"]},
+     "severity": "GREEN", "expected": "dark",
+     "reasons": ["expected_dark", "tcp_connect_refused"]},
     {"host": "tower", "kind": "node_exporter", "target": ":9100/metrics", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []},
+     "severity": "GREEN", "expected": "light",
+     "reasons": []},
     {"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": ["tcp_connect_ok"]}
+     "severity": "GREEN", "expected": "light",
+     "reasons": ["tcp_connect_ok"]}
   ]
 }
