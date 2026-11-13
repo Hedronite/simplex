@@ -48,7 +48,7 @@ Retry: one retry after 250 ms, on timeout only. Never retry a refusal.
 
 Exactly 16 codes, closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. `watchdog_only`, `probe_timeout` and `peer_prometheus_*` are not Simplex codes.
 
-An **outcome** code says what the probe saw. A **verdict** code says why the severity is what it is. Outcome codes are informational: they appear alongside a verdict code and never replace one. A check carries at most one outcome code. A healthy HTTP check (200, no body problem) carries none, and a failure with no transport detail (unreachable, DNS error) carries none. Under a blind vantage a check carries only `vantage_blind`. `reasons[]` is sorted bytewise ascending and has no duplicates.
+An **outcome** code says what the probe saw. A **verdict** code says why the severity is what it is. Outcome codes are informational: they appear alongside a verdict code and never replace one. A check carries at most one outcome code. A healthy HTTP check (200, no body problem) carries none, and a failure with no transport detail (unreachable, DNS error) carries none. Under a blind vantage a check carries only `vantage_blind`. `checks[].reasons[]` is sorted bytewise ascending and has no duplicates. `hosts[].reasons[]` is not re-sorted: it follows the order in section 6.
 
 | Code | Class | Emitted when |
 | --- | --- | --- |
@@ -148,7 +148,7 @@ holds:
   - host: tower              # slug or "*"
     kind: ts_reach           # kind or "*"
     reason: planned reboot   # required, scrubbed in CI
-    until: 2026-11-20T00:00:00Z  # RFC 3339, required
+    until: "2026-11-20T00:00:00Z"  # RFC 3339 string, required; quote it
 ```
 
 | Field | Required | Rule |
