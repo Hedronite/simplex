@@ -34,6 +34,10 @@ type Observation struct {
 	Expected contract.Expected
 	Result   contract.Result
 	Outcome  contract.Reason
+	// Enrichment holds the informational codes from the local tailnet daemon
+	// (docs/semantics.md section 15). They ride along on the check's reasons
+	// and never change a result or a severity.
+	Enrichment []contract.Reason
 }
 
 // Input is everything the engine needs. Now is the single run clock.
@@ -90,6 +94,7 @@ func Evaluate(in *Input) (document.Document, error) {
 			if o.Outcome != "" {
 				c.Reasons = append(c.Reasons, o.Outcome)
 			}
+			c.Reasons = append(c.Reasons, o.Enrichment...)
 			switch {
 			case holdMatches(in.Holds, o, in.Now):
 				held[i] = true
@@ -245,6 +250,36 @@ func validate(o *Observation) error {
 		return fmt.Errorf("check %s %s: unknown expected %q", o.Host, o.Kind, o.Expected)
 	case o.Outcome != "" && !isOutcome(o.Outcome):
 		return fmt.Errorf("check %s %s: %q is not an outcome code", o.Host, o.Kind, o.Outcome)
+	}
+	return validateEnrichment(o)
+}
+
+// validateEnrichment enforces the section 15 rules on the codes a caller passed:
+// only enrichment codes, only on ts_reach, at most one per group, and a path
+// code only beside a matched peer-state code.
+func validateEnrichment(o *Observation) error {
+	if len(o.Enrichment) == 0 {
+		return nil
+	}
+	if o.Kind != contract.KindTSReach {
+		return fmt.Errorf("check %s %s: enrichment codes are only valid on ts_reach", o.Host, o.Kind)
+	}
+	var peer, path []contract.Reason
+	for _, r := range o.Enrichment {
+		switch {
+		case slices.Contains(contract.EnrichmentPeerState, r):
+			peer = append(peer, r)
+		case slices.Contains(contract.EnrichmentPath, r):
+			path = append(path, r)
+		default:
+			return fmt.Errorf("check %s %s: %q is not an enrichment code", o.Host, o.Kind, r)
+		}
+	}
+	switch {
+	case len(peer) > 1 || len(path) > 1:
+		return fmt.Errorf("check %s %s: more than one enrichment code in a group", o.Host, o.Kind)
+	case len(path) == 1 && (len(peer) == 0 || peer[0] == contract.ReasonTSPeerUnmatched):
+		return fmt.Errorf("check %s %s: a path code needs a matched peer-state code", o.Host, o.Kind)
 	}
 	return nil
 }

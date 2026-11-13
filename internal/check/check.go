@@ -19,6 +19,7 @@ import (
 	"github.com/Hedronite/simplex/internal/overlay"
 	"github.com/Hedronite/simplex/internal/probe"
 	"github.com/Hedronite/simplex/internal/severity"
+	"github.com/Hedronite/simplex/internal/tailscale"
 	"github.com/Hedronite/simplex/internal/vantage"
 )
 
@@ -45,6 +46,10 @@ type Deps struct {
 	Runner *probe.Runner
 	Lister vantage.Lister
 	Getenv func(string) string
+	// TailscaleSocket, when set, replaces the configured LocalAPI socket path.
+	// It exists so a test can point enrichment at a fake daemon; the shipped
+	// binary never sets it.
+	TailscaleSocket string
 }
 
 // Result is what a completed run produced. Warnings is filled even when Run
@@ -156,6 +161,8 @@ func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
 		observed = d.Runner.Run(ctx, instances)
 	}
 
+	enrichment := enrich(ctx, cfg, instances, status, d.TailscaleSocket, res)
+
 	in := severity.Input{
 		Now:           p.Now,
 		VantageID:     cfg.Vantage.ID,
@@ -167,6 +174,7 @@ func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
 			Host: observed[i].Host, Kind: observed[i].Kind, Target: observed[i].Target,
 			Expected: resolved[i].Expected,
 			Result:   observed[i].Result, Outcome: observed[i].Outcome,
+			Enrichment: enrichment[i],
 		}
 	}
 	for _, h := range cfg.ActiveHolds() {
@@ -331,4 +339,75 @@ func safePath(path string) string {
 		prev = name
 	}
 	return path
+}
+
+// enrich asks the local tailnet daemon what it knows about the peer of every
+// ts_reach check (docs/semantics.md section 15). It makes at most one request
+// per pass and none when enrichment is off or the vantage is blind. Any failure
+// is soft: one fixed warning by field path, no codes, and the pass carries on.
+// The returned slice is indexed like instances.
+func enrich(ctx context.Context, cfg *config.Config, instances []probe.Instance, status contract.VantageStatus, socketOverride string, res *Result) [][]contract.Reason {
+	out := make([][]contract.Reason, len(instances))
+	if !cfg.Tailscale.LocalAPI || status == contract.VantageBlind {
+		return out
+	}
+	warn := func(msg string) {
+		res.Warnings = append(res.Warnings, config.Finding{
+			Level: config.LevelWarning, Path: "tailscale", Line: cfg.Tailscale.Line, Message: msg,
+		})
+	}
+	socket := cfg.Tailscale.SocketPath()
+	if socketOverride != "" {
+		socket = socketOverride
+	}
+	client, err := tailscale.New(socket)
+	if err != nil {
+		warn("tailscale LocalAPI socket path is not usable: no enrichment this pass")
+		return out
+	}
+	st, err := client.Status(ctx)
+	if err != nil {
+		switch {
+		case errors.Is(err, tailscale.ErrDenied):
+			warn("tailscale LocalAPI denied the request: no enrichment this pass")
+		case errors.Is(err, tailscale.ErrBadPayload), errors.Is(err, tailscale.ErrTooLarge):
+			warn("tailscale LocalAPI answered with an unusable response: no enrichment this pass")
+		default:
+			warn("tailscale LocalAPI is unavailable: no enrichment this pass")
+		}
+		return out
+	}
+	for i := range instances {
+		if instances[i].Kind != contract.KindTSReach {
+			continue
+		}
+		out[i] = peerCodes(st, instances[i].Address)
+	}
+	return out
+}
+
+// peerCodes maps what the daemon knows about one address to enrichment codes.
+// The vantage's own node gets none, and an address the daemon does not list is
+// unmatched. Only booleans leave this function.
+func peerCodes(st *tailscale.Status, address string) []contract.Reason {
+	e, ok := st.Match(address)
+	switch {
+	case !ok:
+		return []contract.Reason{contract.ReasonTSPeerUnmatched}
+	case e.Self:
+		return nil
+	}
+	codes := make([]contract.Reason, 0, 2)
+	if e.Online {
+		codes = append(codes, contract.ReasonTSPeerOnline)
+	} else {
+		codes = append(codes, contract.ReasonTSPeerOffline)
+	}
+	switch {
+	case e.Direct:
+		codes = append(codes, contract.ReasonTSPathDirect)
+	case e.Relayed:
+		codes = append(codes, contract.ReasonTSPathRelayed)
+	}
+	return codes
 }

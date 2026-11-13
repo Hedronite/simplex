@@ -19,6 +19,18 @@ import (
 
 var fixtureNow = time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
 
+func enrichmentOf(c document.Check) []contract.Reason {
+	var out []contract.Reason
+	for _, r := range c.Reasons {
+		for _, s := range contract.ReasonSpecs {
+			if s.Code == r && s.Class == contract.ClassEnrichment {
+				out = append(out, r)
+			}
+		}
+	}
+	return out
+}
+
 func outcomeOf(t *testing.T, c document.Check) contract.Reason {
 	t.Helper()
 	var out contract.Reason
@@ -43,6 +55,7 @@ func inputFromDocument(t *testing.T, d document.Document) Input {
 		in.Checks = append(in.Checks, Observation{
 			Host: c.Host, Kind: c.Kind, Target: c.Target,
 			Expected: c.Expected, Result: c.Result, Outcome: outcomeOf(t, c),
+			Enrichment: enrichmentOf(c),
 		})
 		if slices.Contains(c.Reasons, contract.ReasonHeld) {
 			in.Holds = append(in.Holds, Hold{

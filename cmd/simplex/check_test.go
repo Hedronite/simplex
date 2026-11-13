@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -112,7 +113,8 @@ func fixtureDeps(t *testing.T, doc *document.Document, ovPath string) *Deps {
 		Transport: fakeTransport{plans: https},
 		Clock:     instantClock{},
 	})
-	return &Deps{Runner: runner, Lister: fakeLister(doc.Vantage.Status != contract.VantageBlind), Getenv: func(string) string { return "" }, Now: time.Now}
+	socket := fixtureLocalAPI(t, doc, ov)
+	return &Deps{Runner: runner, Lister: fakeLister(doc.Vantage.Status != contract.VantageBlind), Getenv: func(string) string { return "" }, Now: time.Now, TailscaleSocket: socket}
 }
 
 func readFile(t *testing.T, path string) []byte {
@@ -452,4 +454,63 @@ func TestRealDialerAgainstALoopbackListener(t *testing.T) {
 	if strings.Contains(r.stdout, "127.0.0.1") {
 		t.Fatalf("the overlay address reached the document:\n%s", r.stdout)
 	}
+}
+
+// fixtureLocalAPI starts a fake tailnet daemon for a case whose document carries
+// enrichment codes, with one peer per matched ts_reach check built from the codes
+// (documentation values only). It returns the socket path, or "" when the case
+// has no enrichment.
+func fixtureLocalAPI(t *testing.T, doc *document.Document, ov *overlay.Overlay) string {
+	t.Helper()
+	var peers []string
+	enriched := false
+	for _, c := range doc.Checks {
+		if c.Kind != contract.KindTSReach {
+			continue
+		}
+		has := func(r contract.Reason) bool {
+			for _, x := range c.Reasons {
+				if x == r {
+					return true
+				}
+			}
+			return false
+		}
+		if !has(contract.ReasonTSPeerOnline) && !has(contract.ReasonTSPeerOffline) && !has(contract.ReasonTSPeerUnmatched) {
+			continue
+		}
+		enriched = true
+		if has(contract.ReasonTSPeerUnmatched) {
+			continue
+		}
+		cur, relay := "", ""
+		if has(contract.ReasonTSPathDirect) {
+			cur = "198.51.100.1:41641"
+		}
+		if has(contract.ReasonTSPathRelayed) {
+			relay = "mia"
+		}
+		peers = append(peers, fmt.Sprintf(`"nodekey:%s":{"DNSName":"%s.","Online":%t,"CurAddr":"%s","Relay":"%s","PublicKey":"nodekey:fixture","Addrs":["198.51.100.2:1"]}`,
+			c.Host, ov.Hosts[c.Host].Address, has(contract.ReasonTSPeerOnline), cur, relay))
+	}
+	if !enriched {
+		return ""
+	}
+	dir, err := os.MkdirTemp("/tmp", "sx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "ts.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"BackendState":"Running","Self":{"TailscaleIPs":["203.0.113.7"],"DNSName":"vantage.example."},"Peer":{` + strings.Join(peers, ",") + `}}`
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}), ReadHeaderTimeout: 2 * time.Second}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	return sock
 }

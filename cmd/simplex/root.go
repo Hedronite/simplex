@@ -31,6 +31,11 @@ type Deps struct {
 	Now func() time.Time
 	// Getenv reads the environment (SIMPLEX_OVERLAY).
 	Getenv func(string) string
+	// TailscaleSocket, when set, replaces the configured LocalAPI socket path.
+	// A test uses it to point enrichment at a fake daemon; the shipped binary
+	// never sets it.
+	TailscaleSocket string
+
 	// beforeServe is a test-only hook: when set, serve calls it in the server
 	// goroutine just before Serve starts, so a test can hold Serve back and force a
 	// stop into the window between listening and serving. Nothing outside this

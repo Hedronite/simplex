@@ -358,6 +358,33 @@ func TestPayloadLimits(t *testing.T) {
 		}
 	})
 
+	// A body of exactly MaxBody bytes is the largest accepted; one more is not.
+	// The padding is JSON whitespace, so the document is valid at that size.
+	t.Run("exactly MaxBody is accepted", func(t *testing.T) {
+		const doc = `{"BackendState":"Running","Peer":{}}`
+		body := doc + strings.Repeat(" ", MaxBody-len(doc))
+		if len(body) != MaxBody {
+			t.Fatalf("test body is %d bytes, want %d", len(body), MaxBody)
+		}
+		d := newFakeDaemon(t, serveBody(http.StatusOK, body))
+		st, err := d.client(t).Status(context.Background())
+		if err != nil {
+			t.Fatalf("a body of exactly MaxBody bytes was refused: %v", err)
+		}
+		if st.BackendState != "Running" {
+			t.Fatalf("BackendState %q", st.BackendState)
+		}
+	})
+
+	t.Run("one byte over MaxBody is too large", func(t *testing.T) {
+		const doc = `{"BackendState":"Running","Peer":{}}`
+		body := doc + strings.Repeat(" ", MaxBody+1-len(doc))
+		d := newFakeDaemon(t, serveBody(http.StatusOK, body))
+		if _, err := d.client(t).Status(context.Background()); !errors.Is(err, ErrTooLarge) {
+			t.Fatalf("got %v, want ErrTooLarge", err)
+		}
+	})
+
 	t.Run("oversize", func(t *testing.T) {
 		big := strings.Repeat("x", MaxBody+1)
 		d := newFakeDaemon(t, serveBody(http.StatusOK, big))

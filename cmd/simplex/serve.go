@@ -121,7 +121,7 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 	params := func(now time.Time) *check.Params {
 		return &check.Params{Config: f.config, Overlay: f.overlay, Now: now}
 	}
-	cdeps := &check.Deps{Runner: deps.Runner, Lister: deps.Lister, Getenv: deps.Getenv}
+	cdeps := &check.Deps{Runner: deps.Runner, Lister: deps.Lister, Getenv: deps.Getenv, TailscaleSocket: deps.TailscaleSocket}
 	startNow := now().UTC().Truncate(time.Second)
 	res, err := check.Prepare(params(startNow), cdeps)
 	logWarnings(logger, res.Warnings)
