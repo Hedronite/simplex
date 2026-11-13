@@ -75,7 +75,8 @@ func TestFixturesReproduceByteForByte(t *testing.T) {
 			if err := json.Unmarshal(raw, &want); err != nil {
 				t.Fatal(err)
 			}
-			got, err := Evaluate(inputFromDocument(t, want))
+			in := inputFromDocument(t, want)
+			got, err := Evaluate(&in)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -90,8 +91,8 @@ func TestFixturesReproduceByteForByte(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if ExitCode(got) != code {
-				t.Fatalf("exit code %d, fixture says %d", ExitCode(got), code)
+			if ExitCode(&got) != code {
+				t.Fatalf("exit code %d, fixture says %d", ExitCode(&got), code)
 			}
 		})
 	}
@@ -115,7 +116,7 @@ func obs(host string, kind contract.Kind, expected contract.Expected, result con
 
 func eval(t *testing.T, status contract.VantageStatus, holds []Hold, checks ...Observation) document.Document {
 	t.Helper()
-	d, err := Evaluate(Input{Now: fixtureNow, VantageID: "lathe", VantageStatus: status, Holds: holds, Checks: checks})
+	d, err := Evaluate(&Input{Now: fixtureNow, VantageID: "lathe", VantageStatus: status, Holds: holds, Checks: checks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,8 +160,8 @@ func TestRuleRows(t *testing.T) {
 
 func TestUnknownNeverRedAlone(t *testing.T) {
 	d := eval(t, contract.VantageOK, nil, obs("h", contract.KindNodeExporter, contract.ExpectedLight, contract.ResultUnknown, contract.ReasonHTTPTimeout))
-	if d.Overall != contract.SeverityYellow || ExitCode(d) != exitcode.Yellow {
-		t.Fatalf("overall %s exit %d", d.Overall, ExitCode(d))
+	if d.Overall != contract.SeverityYellow || ExitCode(&d) != exitcode.Yellow {
+		t.Fatalf("overall %s exit %d", d.Overall, ExitCode(&d))
 	}
 }
 
@@ -181,8 +182,8 @@ func TestBlindIsTerminal(t *testing.T) {
 			t.Fatalf("blind host %s is %s", h.ID, h.Severity)
 		}
 	}
-	if d.Overall != contract.SeverityRed || ExitCode(d) != exitcode.Blind {
-		t.Fatalf("overall %s exit %d", d.Overall, ExitCode(d))
+	if d.Overall != contract.SeverityRed || ExitCode(&d) != exitcode.Blind {
+		t.Fatalf("overall %s exit %d", d.Overall, ExitCode(&d))
 	}
 }
 
@@ -204,7 +205,7 @@ func TestPairPass(t *testing.T) {
 			!slices.Contains(d.Checks[1].Reasons, contract.ReasonProbeUnknown) {
 			t.Fatalf("underlying verdicts were replaced: %+v", d.Checks)
 		}
-		if d.Overall != contract.SeverityRed || ExitCode(d) != exitcode.Red {
+		if d.Overall != contract.SeverityRed || ExitCode(&d) != exitcode.Red {
 			t.Fatalf("overall %s", d.Overall)
 		}
 	})
@@ -285,7 +286,7 @@ func TestInvalidInput(t *testing.T) {
 		"bad kind":        {Now: fixtureNow, VantageStatus: contract.VantageOK, Checks: []Observation{{Host: "h", Kind: "x", Target: ":1", Expected: "light", Result: "up"}}},
 		"verdict outcome": {Now: fixtureNow, VantageStatus: contract.VantageOK, Checks: []Observation{{Host: "h", Kind: "ts_reach", Target: ":1", Expected: "light", Result: "up", Outcome: "held"}}},
 	} {
-		if _, err := Evaluate(in); err == nil {
+		if _, err := Evaluate(&in); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
 	}
@@ -325,7 +326,7 @@ func TestInvariantsOverRandomInputs(t *testing.T) {
 			in.Holds = append(in.Holds, Hold{Host: hosts[rng.Intn(len(hosts))], Kind: string(kinds[rng.Intn(len(kinds))]),
 				Until: fixtureNow.Add(time.Duration(rng.Intn(3)-1) * time.Hour)})
 		}
-		d, err := Evaluate(in)
+		d, err := Evaluate(&in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -348,7 +349,7 @@ func TestInvariantsOverRandomInputs(t *testing.T) {
 		if worst != d.Overall {
 			t.Fatalf("overall %s, worst host %s", d.Overall, worst)
 		}
-		if ExitCode(d) == exitcode.Blind != (d.Vantage.Status == contract.VantageBlind) {
+		if ExitCode(&d) == exitcode.Blind != (d.Vantage.Status == contract.VantageBlind) {
 			t.Fatalf("exit/blind mismatch")
 		}
 		for i, c := range d.Checks {

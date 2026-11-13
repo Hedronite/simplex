@@ -53,7 +53,7 @@ var promOutcomes = map[contract.Reason]bool{
 
 // Evaluate derives the document. Checks and hosts come out sorted by
 // (host, kind, target) and by host id, bytewise.
-func Evaluate(in Input) (document.Document, error) {
+func Evaluate(in *Input) (document.Document, error) {
 	if len(in.Checks) == 0 {
 		return document.Document{}, ErrNoChecks
 	}
@@ -61,12 +61,13 @@ func Evaluate(in Input) (document.Document, error) {
 		return document.Document{}, fmt.Errorf("vantage status %q is not valid", in.VantageStatus)
 	}
 	obs := slices.Clone(in.Checks)
-	sort.SliceStable(obs, func(i, j int) bool { return less(obs[i], obs[j]) })
-	for i, o := range obs {
+	sort.SliceStable(obs, func(i, j int) bool { return less(&obs[i], &obs[j]) })
+	for i := range obs {
+		o := &obs[i]
 		if err := validate(o); err != nil {
 			return document.Document{}, err
 		}
-		if i > 0 && !less(obs[i-1], o) {
+		if i > 0 && !less(&obs[i-1], o) {
 			return document.Document{}, fmt.Errorf("duplicate check %s %s %s", o.Host, o.Kind, o.Target)
 		}
 	}
@@ -74,7 +75,8 @@ func Evaluate(in Input) (document.Document, error) {
 	blind := in.VantageStatus == contract.VantageBlind
 	checks := make([]document.Check, len(obs))
 	held := make([]bool, len(obs))
-	for i, o := range obs {
+	for i := range obs {
+		o := &obs[i]
 		c := document.Check{
 			Host: o.Host, Kind: o.Kind, Target: o.Target,
 			Result: o.Result, Expected: o.Expected,
@@ -143,7 +145,7 @@ func Evaluate(in Input) (document.Document, error) {
 }
 
 // ExitCode maps a document to its process exit code (semantics section 10).
-func ExitCode(d document.Document) int {
+func ExitCode(d *document.Document) int {
 	if d.Vantage.Status == contract.VantageBlind {
 		return exitcode.Blind
 	}
@@ -220,7 +222,7 @@ func deriveHosts(checks []document.Check) []document.Host {
 	return hosts
 }
 
-func holdMatches(holds []Hold, o Observation, now time.Time) bool {
+func holdMatches(holds []Hold, o *Observation, now time.Time) bool {
 	for _, h := range holds {
 		if (h.Host == contract.Wildcard || h.Host == o.Host) &&
 			(h.Kind == contract.Wildcard || h.Kind == string(o.Kind)) &&
@@ -231,7 +233,7 @@ func holdMatches(holds []Hold, o Observation, now time.Time) bool {
 	return false
 }
 
-func validate(o Observation) error {
+func validate(o *Observation) error {
 	switch {
 	case o.Host == "" || o.Target == "":
 		return fmt.Errorf("check %s %s: host and target are required", o.Host, o.Kind)
@@ -256,7 +258,7 @@ func isOutcome(r contract.Reason) bool {
 	return false
 }
 
-func less(a, b Observation) bool {
+func less(a, b *Observation) bool {
 	if a.Host != b.Host {
 		return a.Host < b.Host
 	}

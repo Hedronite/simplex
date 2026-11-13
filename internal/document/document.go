@@ -47,7 +47,7 @@ type Check struct {
 
 // Encode returns the document in its canonical byte layout: two-space
 // indent, one line per host, three lines per check, trailing newline.
-func (d Document) Encode() []byte {
+func (d *Document) Encode() []byte {
 	var b bytes.Buffer
 	b.WriteString("{\n")
 	b.WriteString("  \"apiVersion\": " + q(d.APIVersion) + ",\n")
