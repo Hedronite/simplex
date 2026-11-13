@@ -25,6 +25,7 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 
 - `expected` (`light` or `dark`) is **required on every check**, in config and in the document. There is no per-kind default.
 - Port 18080 is never dialed. Config load rejects any check that names it, and the dialer refuses it too.
+- `path` is legal only on `prom_up`, in config and in overlay overrides. A `path` on any other kind is a config error (exit `3`).
 - `prom_up` path comes from an allowlist: `/metrics`, `/-/ready`, `/-/healthy`; default `/-/ready`. HTTP only, host must be an overlay slug, no userinfo, no query, no redirects, 1 MiB body cap.
 - `kube_apiserver` is a TCP connect to `:6443` and nothing more: no TLS handshake, no HTTP request, no credentials. Another project owns TLS and everything above the connect, so a closed or filtered port is the only thing this kind can report.
 - `lan_reach` and `ssh` land in the third S1 slice. Their rows are intent. The kind names are frozen.
@@ -72,14 +73,14 @@ An **outcome** code says what the probe saw. A **verdict** code says why the sev
 
 Evaluated per check, in this order. The first rule that matches decides the severity; outcome codes from the probe are always kept.
 
-1. **Blind vantage:** result `unknown`, severity RED, reasons `[vantage_blind]`. Overrides holds and expected-dark.
+1. **Blind vantage:** result `unknown`, severity RED, reasons `[vantage_blind]`. Terminal: it ends evaluation for the check, overrides holds and expected-dark, and the pair pass (rule 5) is skipped under a blind vantage. A blind check carries only `vantage_blind`.
 2. **Held** (an unexpired hold matches host and kind): severity GREEN, reasons gain `held`, whatever the result. The check still runs and reports its real result.
 3. **Expected dark:** not up gives GREEN `expected_dark`. Up gives YELLOW `unexpected_light`. The prom status map does not apply here.
 4. **Expected light:**
    - up: GREEN. The outcome codes `prom_not_ready`, `prom_auth` and `metrics_body_unexpected` raise it to YELLOW; they refine the `up` and add no verdict code.
    - down: YELLOW `unexpected_dark`.
    - unknown: YELLOW `probe_unknown`. Never RED on its own.
-5. **Prometheus pair**, after rules 1 to 4, over the non-held, expected-light `prom_up` checks. With fewer than two such checks the rule is off. If none is up, each of them becomes RED and gains `prom_pair_down`. If at least one is up and at least one is not, each not-up check becomes YELLOW and gains `prom_pair_degraded`. The pair code is added to the check's other reasons, not substituted. Severity lands on `checks[]` and flows up by derivation (section 6).
+5. **Prometheus pair**, after rules 1 to 4 and never under a blind vantage, over the non-held, expected-light `prom_up` checks. With fewer than two such checks the rule is off. If none is up, each of them becomes RED and gains `prom_pair_down`. If at least one is up and at least one is not, each not-up check becomes YELLOW and gains `prom_pair_degraded`. The pair code is added to the check's other reasons, not substituted. Severity lands on `checks[]` and flows up by derivation (section 6).
 
 An unexpected `node_exporter` that is not up is YELLOW, never RED on its own. A held `prom_up` check is outside the pair, so held plus down never fires the pair rule.
 
@@ -97,15 +98,15 @@ Pinned so the order cannot be guessed. First matching rule of the list above; pa
 | light | up | `metrics_body_unexpected` | none | YELLOW |
 | light | down | `http_unexpected_status` | `unexpected_dark` | YELLOW |
 | light | unknown | `tcp_connect_timeout` | `probe_unknown` | YELLOW |
-| any | any | any | `held` | GREEN |
 | any | unknown | none (`vantage_blind` alone) | `vantage_blind` | RED |
+| any | any | any | `held` (vantage not blind) | GREEN |
 
 ## 6. Derivation
 
 - `hosts[].severity` is the worst severity among that host's checks.
 - `hosts[].reasons` is the union of `reasons[]` from the host's worst-severity checks, taken in (kind, target) order, first occurrence kept, so a GREEN host lists the reasons of all its checks.
 - `overall` is the worst host severity.
-- A host with no checks gets no `hosts[]` entry.
+- Config requires at least one host and at least one check on every host, and the probe schema requires `hosts` to have at least one entry, so `overall` is always derived from something observed and is never vacuous.
 - Held and expected-dark checks are GREEN, so they never raise any rollup.
 - **Blind:** every check and host is RED, so `overall` is RED by plain derivation. The only special case is the forced `unknown` results (section 5, rule 1), which a test pins.
 - Hosts are sorted by id and checks by (host, kind, target), bytewise ascending. No map iteration reaches the JSON.
@@ -120,7 +121,9 @@ Pinned so the order cannot be guessed. First matching rule of the list above; pa
 
 The local test looks for an address in `100.64.0.0/10` on an interface; the remote test runs each canary. No `tailscale` CLI is needed. Blind exits `5` with the document written.
 
-Config shape: `vantage: {id: <slug>, canaries: [{host, kind, target}]}`. A canary names a configured check by its (host, kind, target) triple, and the kind must be `ts_reach`. No canaries means `unchecked`.
+Config shape: `vantage: {id: <slug>, canaries: [{host, kind, target}]}`. A canary names a configured check by its (host, kind, target) triple, and the kind must be `ts_reach`. The `target` is the check's **effective** target after the kind's default port is applied (a `ts_reach` check with no `port` is `:9100`), before any overlay override. No canaries means `unchecked`.
+
+Test note: a canary written `:9100` resolves to a `ts_reach` check configured with no `port`; a canary `:9101` does not resolve to that check and fails `validate`; a canary naming a check that does not exist, or a non-`ts_reach` kind, fails `validate`.
 
 ## 8. Files
 
@@ -153,8 +156,8 @@ holds:
 | `apiVersion` | yes | `const simplex.config/v0` |
 | `vantage.id` | yes | slug |
 | `vantage.canaries` | no | check references; each names a configured `ts_reach` check |
-| `hosts[]` | yes | each `id` unique; a host with no checks is allowed and produces no `hosts[]` entry in the document |
-| `hosts[].checks[]` | no | `kind` and `expected` required; `port` and `path` optional |
+| `hosts[]` | yes, at least 1 | each `id` unique |
+| `hosts[].checks[]` | yes, at least 1 | `kind` and `expected` required; `port` optional; `path` only on `prom_up` |
 | `holds[]` | no | `host`, `kind`, `reason`, `until` all required |
 
 `example.yaml` in the repo root is a config document with public slugs only. It validates against the config schema in CI.
