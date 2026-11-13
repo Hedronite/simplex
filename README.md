@@ -162,14 +162,70 @@ holds:                            # temporary announced darks; all fields requir
   missing slugs. Overlay files (`simplex.overlay.yaml`, `*.overlay.yaml`) are
   gitignored; never commit one.
 
-## Metrics
+## Serve and metrics
 
-`serve` exports gauges with the `simplex_` prefix. Labels carry host slugs and
-check kinds only — never addresses. The listener binds loopback by default;
-the provisional address is `127.0.0.1:10081` (unconfirmed; S2 finalizes it —
-do not scrape it in production config yet). The document writer of record is
-`serve --out`, which writes the same snapshot it serves on every interval;
-`check --json --out` on a timer is the supported fallback.
+`simplex serve` probes on an interval and serves the latest result as
+Prometheus metrics on `GET /metrics`, loopback by default at
+`127.0.0.1:10081` (the `contract.MetricsListen` constant — `serve --help`
+quotes it from there). It binds loopback only; a non-loopback `--listen` is
+refused unless `--unsafe-allow-non-loopback` is set, and then a warning is
+logged on every start: `/metrics` has no authentication.
+
+```console
+$ simplex serve --help
+Run a probe pass every --interval and serve the latest result as
+Prometheus metrics on GET /metrics.
+Each pass produces one snapshot; /metrics and --out are built from the same
+one. With --out, serve is the writer of record for the document file: the
+snapshot is written every interval by temp file, fsync and atomic rename.
+serve binds loopback only. A non-loopback --listen is refused unless
+--unsafe-allow-non-loopback is set, and then a warning is printed on every start:
+/metrics has no authentication.
+A failing pass after startup is counted (simplex_run_errors_total) and logged
+by field path only, and the last good snapshot stays; serve never exits on
+severity. SIGINT or SIGTERM finishes the pass in flight and exits 0.
+Exit codes: 0 normal stop, 3 config or usage error at startup, 4 the address
+cannot be bound or the server fails.
+```
+
+The real exposition from `example.yaml`, run from a machine with no route to
+the mesh (excerpt; the full output has one severity, three one-hot result and
+sixteen one-hot reason series per check):
+
+```console
+$ curl -s http://127.0.0.1:10081/metrics
+# HELP simplex_build_info Build information for this binary.
+# TYPE simplex_build_info gauge
+simplex_build_info{version="dev",commit="unknown"} 1
+# HELP simplex_overall_severity Worst severity of the last completed run: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_overall_severity gauge
+simplex_overall_severity 2
+# HELP simplex_vantage_status One-hot vantage status of the last completed run.
+# TYPE simplex_vantage_status gauge
+simplex_vantage_status{status="ok"} 0
+simplex_vantage_status{status="blind"} 1
+simplex_vantage_status{status="unchecked"} 0
+# HELP simplex_host_severity Severity of one host: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_host_severity gauge
+simplex_host_severity{host="box"} 2
+simplex_host_severity{host="lathe"} 2
+simplex_host_severity{host="tower"} 2
+# HELP simplex_check_severity Severity of one check instance: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_check_severity gauge
+simplex_check_severity{host="box",kind="prom_up",target=":9090/metrics"} 2
+...
+```
+
+The full series table, the one-hot rulings, the cold-start behavior and the
+cardinality formula are in `docs/metrics.md`.
+
+**Scope:** Simplex reports what it probes. There are no disk series — disk
+severity reaches the mesh summary through Cubit — and no alert-state series.
+Labels carry host slugs, check kinds and target forms only, never addresses.
+
+**Deployment is a separate decision:** building `serve` is part of this
+repository; seating it on a mesh host and adding its scrape job to a
+Prometheus configuration needs its own sign-off.
 
 ## Security notes
 
