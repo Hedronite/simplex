@@ -82,37 +82,44 @@ func TestAttemptTimeoutIsVirtual(t *testing.T) {
 // work, mark the instances it never started as unknown, and wait only for
 // what is already in flight. Otherwise a permit released by an in-flight probe
 // lets the loop start another one whose budget is already spent.
+//
+// The scenario runs many times because the failure it guards against is a
+// select that has two ready cases at the same instant: one pass proves
+// nothing, and this caught a real one-in-many flake.
 func TestDispatchStopsAtTheRunDeadline(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		var dials atomic.Int32
-		runner := New(&Options{
-			Concurrency: 1,
-			Timeout:     5 * time.Second,
-			Deadline:    100 * time.Millisecond,
-			RetryDelay:  time.Millisecond,
-			Dialer: dialFunc(func(ctx context.Context, _, _ string) (net.Conn, error) {
-				dials.Add(1)
-				<-ctx.Done()
-				return nil, ctx.Err()
-			}),
-		})
-		start := time.Now()
-		obs := runner.Run(context.Background(), []Instance{
-			{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
-			{Host: "box", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
-			{Host: "apiary", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
-		})
-		elapsed := time.Since(start)
+		const passes = 200
+		for pass := 0; pass < passes; pass++ {
+			var dials atomic.Int32
+			runner := New(&Options{
+				Concurrency: 1,
+				Timeout:     5 * time.Second,
+				Deadline:    100 * time.Millisecond,
+				RetryDelay:  time.Millisecond,
+				Dialer: dialFunc(func(ctx context.Context, _, _ string) (net.Conn, error) {
+					dials.Add(1)
+					<-ctx.Done()
+					return nil, ctx.Err()
+				}),
+			})
+			start := time.Now()
+			obs := runner.Run(context.Background(), []Instance{
+				{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+				{Host: "box", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+				{Host: "apiary", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+			})
+			elapsed := time.Since(start)
 
-		if elapsed != 100*time.Millisecond {
-			t.Fatalf("run took %v, want exactly the deadline", elapsed)
-		}
-		if got := dials.Load(); got != 1 {
-			t.Fatalf("dialled %d instances, want only the one that was in flight when the deadline hit", got)
-		}
-		for i, o := range obs {
-			if o.Result != contract.ResultUnknown {
-				t.Fatalf("observation %d: got %s, want unknown once the run is over", i, o.Result)
+			if elapsed != 100*time.Millisecond {
+				t.Fatalf("pass %d: run took %v, want exactly the deadline", pass, elapsed)
+			}
+			if got := dials.Load(); got != 1 {
+				t.Fatalf("pass %d: dialled %d instances, want only the one that was in flight when the deadline hit", pass, got)
+			}
+			for i, o := range obs {
+				if o.Result != contract.ResultUnknown {
+					t.Fatalf("pass %d: observation %d is %s, want unknown once the run is over", pass, i, o.Result)
+				}
 			}
 		}
 	})
