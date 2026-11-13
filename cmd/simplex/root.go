@@ -71,14 +71,25 @@ func wantsJSON(args []string) bool {
 
 func newRoot(deps *Deps, stdout, stderr io.Writer) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "simplex",
-		Short:         "Probe a mesh from one vantage and report structured health",
+		Use:   "simplex",
+		Short: "Probe a mesh from one vantage and report structured health",
+		Long: `Probe a mesh from one vantage and report structured health.
+
+Commands:
+  check     probe every configured check once and report the verdict
+  validate  load and check the config and overlay without probing
+  version   print the version
+
+Flags, where they apply: --config, --overlay, --json, --now, --out.
+Exit codes: 0 GREEN, 1 YELLOW, 2 RED, 3 config or usage error,
+4 runtime or I/O error, 5 vantage blind. docs/semantics.md section 12
+is the CLI contract.`,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Args:          cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				return failure.Config("unknown command %q (try: check)", args[0])
+				return failure.Config("unknown command %q (try: check, validate, version)", args[0])
 			}
 			return cmd.Help()
 		},
@@ -89,7 +100,7 @@ func newRoot(deps *Deps, stdout, stderr io.Writer) *cobra.Command {
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return failure.Config("%s", err.Error())
 	})
-	root.AddCommand(newCheck(deps))
+	root.AddCommand(newCheck(deps), newValidate(deps), newVersion())
 	return root
 }
 

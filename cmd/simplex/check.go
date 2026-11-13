@@ -17,6 +17,7 @@ import (
 	"github.com/Hedronite/simplex/internal/overlay"
 	"github.com/Hedronite/simplex/internal/probe"
 	"github.com/Hedronite/simplex/internal/severity"
+	"github.com/Hedronite/simplex/internal/table"
 	"github.com/Hedronite/simplex/internal/vantage"
 )
 
@@ -60,9 +61,6 @@ document; exits 3 and 4 never do.`,
 }
 
 func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.Writer) error {
-	if !f.json {
-		return failure.Config("check: the table output is not available yet (pass --json)")
-	}
 	now, err := runClock(f.now, deps.Now)
 	if err != nil {
 		return err
@@ -145,13 +143,37 @@ func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.
 			return failure.Runtime(err, "write --out file %s", f.out)
 		}
 	}
-	if _, err := stdout.Write(body); err != nil {
-		return failure.Runtime(err, "write document to stdout")
+	if f.json {
+		if _, err := stdout.Write(body); err != nil {
+			return failure.Runtime(err, "write document to stdout")
+		}
+	} else {
+		// The table is a renderer of the same document; only the
+		// severity word is colored, and only on a terminal without
+		// NO_COLOR.
+		fmt.Fprint(stdout, table.Render(&doc, colorFor(stdout, deps.Getenv)))
 	}
 	if code := severity.ExitCode(&doc); code != 0 {
 		return &statusExit{code: code}
 	}
 	return nil
+}
+
+// colorFor decides whether the table may paint the severity word: only
+// on a character device (a terminal) with NO_COLOR unset.
+func colorFor(w io.Writer, getenv func(string) string) bool {
+	if getenv != nil && getenv("NO_COLOR") != "" {
+		return false
+	}
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
 
 // runClock resolves the run clock: --now when given, else the injected clock.
