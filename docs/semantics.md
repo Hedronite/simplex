@@ -246,12 +246,18 @@ S1 tests for `--out`: the temp file is in the target directory; the target is re
 | Flag | Commands | Meaning |
 | --- | --- | --- |
 | `--config PATH` | `check`, `validate`, `serve` | config file; default `simplex.yaml` in the working directory |
-| `--overlay PATH` | `check`, `serve` | overlay file; resolution order is this flag, then `SIMPLEX_OVERLAY`, then `simplex.overlay.yaml` when present |
+| `--overlay PATH` | `check`, `validate`, `serve` | overlay file; resolution order is this flag, then `SIMPLEX_OVERLAY`, then `simplex.overlay.yaml` when present |
 | `--json` | `check`, `validate`, `version` | print the document, the findings JSON, or the JSON version object instead of the human form |
 | `--now RFC3339` | `check`, `validate` | pins `generated_at` and the hold clock together (section 11); used for reproducible fixtures |
 | `--out PATH` | `check`, `serve` | write the `--json` document to a file (section 11) |
 
-A missing overlay file is not by itself an error; a check that needs an address with no overlay entry fails closed per section 8. `--config` pointing at a missing or invalid file is exit 3.
+Three overlay situations, per command:
+
+- `check` and `serve` need addresses to dial: with a resolved overlay path that cannot be read, or with any check that resolves to no overlay entry, the run fails closed (exit 3), naming the missing slugs per section 8.
+- `validate` resolves the overlay the same way. With a resolved path it loads it and resolves every check against it; an unreadable overlay file, or a host with no entry, is an error (exit 3). With no overlay path resolved at all it emits one warning (`no overlay found: addresses not checked`), skips the resolve step, and exits 0.
+- An explicitly named `--overlay` file that cannot be read is exit 3 on every command that takes the flag.
+
+`--config` pointing at a missing or invalid file is exit 3.
 
 ### Cell contents and color
 
@@ -271,8 +277,9 @@ A missing overlay file is not by itself an error; a check that needs an address 
 
 ### version
 
-- `simplex version` prints `simplex <semver>` and exits `0` in every state.
-- `simplex version --json` prints `{"version": "...", "commit": "...", "built": "..."}` on one line.
+- `simplex version` always prints `simplex <version> (commit <sha>, built <date>)` and exits `0` in every state.
+- A build that did not stamp its metadata (a plain `go build`) uses the fallbacks `dev` for the version and `unknown` for the commit and the build date, so the line is `simplex dev (commit unknown, built unknown)`. The parenthetical is never dropped.
+- `simplex version --json` prints `{"version": "...", "commit": "...", "built": "..."}` on one line, with the same fallback values.
 
 ### Error style
 

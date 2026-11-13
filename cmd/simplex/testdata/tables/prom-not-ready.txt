@@ -1,0 +1,3 @@
+HOST   CHECK                  EXPECTED  RESULT  SEVERITY  REASONS
+box    prom_up :9090/-/ready  light     up      YELLOW    prom_not_ready
+lathe  prom_up :9090/-/ready  light     up      GREEN

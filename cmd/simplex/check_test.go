@@ -243,7 +243,6 @@ func TestUsageErrorsExitThreeWithOneErrorLine(t *testing.T) {
 		"bad now":         {"check", "--json", "--config", cfg, "--overlay", ov, "--now", "yesterday"},
 		"missing config":  {"check", "--json", "--config", filepath.Join(t.TempDir(), "absent.yaml"), "--overlay", ov},
 		"missing overlay": {"check", "--json", "--config", cfg, "--overlay", filepath.Join(t.TempDir(), "absent.txt")},
-		"no table yet":    {"check", "--config", cfg, "--overlay", ov},
 	}
 	for name, args := range cases {
 		t.Run(name, func(t *testing.T) {

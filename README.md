@@ -38,9 +38,46 @@ $ simplex validate --config example.yaml
 $ simplex serve --config example.yaml
 ```
 
-- `check` renders a human table by default; `--json` prints the
-  `simplex.probe/v0` document. Exit codes are identical in both modes.
-- `validate` loads and checks the config and overlay without probing.
+`check` renders the table by default; `--json` prints the `simplex.probe/v0`
+document. Exit codes are identical in both modes. The table from a machine with
+no route to the mesh (a blind vantage, exit 5 — not a mesh failure):
+
+```console
+$ simplex check --config example.yaml
+HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
+box    prom_up :9090/metrics        light     unknown  RED       vantage_blind
+lathe  prom_up :9090/-/ready        light     unknown  RED       vantage_blind
+tower  kube_apiserver :6443         dark      unknown  RED       vantage_blind
+tower  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
+tower  ts_reach :9100               light     unknown  RED       vantage_blind
+$ echo $?
+5
+```
+
+`validate` loads and checks the config and overlay without probing; it prints
+one finding per line, exits 0 with warnings and 3 with errors. On a clean
+checkout there is no private overlay to read, so the addresses are not checked
+and validate says so:
+
+```console
+$ simplex validate --config example.yaml
+warning: no overlay found: addresses not checked
+$ echo $?
+0
+```
+
+With an overlay present (never committed), the same command resolves every
+check against it and is quiet when the config is valid.
+
+`version` prints one line, or a JSON object with `--json`:
+
+```console
+$ simplex version
+simplex dev (commit unknown, built unknown)
+$ simplex version --json
+{"version":"dev","commit":"unknown","built":"unknown"}
+```
+
 - `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
 - Releases are produced with reproducible builds; until then, build from source
   with Go 1.27 or newer.

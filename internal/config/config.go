@@ -44,10 +44,10 @@ const (
 // hosts[0].checks[1].path. Line is the 1-based config line, 0 when no
 // line applies.
 type Finding struct {
-	Level   Level
-	Path    string
-	Message string
-	Line    int
+	Level   Level  `json:"level"`
+	Path    string `json:"path"`
+	Message string `json:"message"`
+	Line    int    `json:"line"`
 }
 
 // Error is the typed failure Load returns when the config is invalid.
