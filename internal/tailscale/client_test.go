@@ -18,6 +18,11 @@ import (
 // reader can see exactly what must not leak.
 const statusFixture = `{
   "BackendState": "Running",
+  "Self": {
+    "Online": true,
+    "DNSName": "vantage.example.",
+    "TailscaleIPs": ["192.0.2.20"]
+  },
   "Peer": {
     "node-direct": {
       "Online": true,
@@ -159,9 +164,10 @@ func TestStatusSuccessAndMatches(t *testing.T) {
 	if status.BackendState != "Running" {
 		t.Fatalf("backend state %q, want Running", status.BackendState)
 	}
-	if status.Peers() != 6 {
-		// Three peers, each keyed by its name and by one address.
-		t.Fatalf("peers %d, want 6 keys", status.Peers())
+	if status.Peers() != 8 {
+		// Three peers plus the vantage's own node, each keyed by its name and
+		// by one address.
+		t.Fatalf("peers %d, want 8 keys", status.Peers())
 	}
 
 	cases := []struct {
@@ -198,6 +204,18 @@ func TestStatusSuccessAndMatches(t *testing.T) {
 			name:    "MagicDNS name without the trailing dot",
 			address: "box.example",
 			want:    Enrichment{Online: false, Direct: false, Relayed: true},
+			matched: true,
+		},
+		{
+			name:    "the vantage's own node by address",
+			address: "192.0.2.20",
+			want:    Enrichment{Self: true, Online: true, Direct: false, Relayed: false},
+			matched: true,
+		},
+		{
+			name:    "the vantage's own node by name",
+			address: "VANTAGE.EXAMPLE",
+			want:    Enrichment{Self: true, Online: true, Direct: false, Relayed: false},
 			matched: true,
 		},
 		{
@@ -388,6 +406,9 @@ func TestSocketPathValidation(t *testing.T) {
 		{"var/run/tailscale/tailscaled.sock", false},
 		{"http://192.0.2.10:41112/localapi", false},
 		{"unix:///var/run/tailscale/tailscaled.sock", false},
+		{"//var/run/tailscale/tailscaled.sock", false},
+		{"/var/run/tailscale//tailscaled.sock", true},
+		{"/var/run/ts sock/tailscaled.sock", false},
 		{"example:41112", false},
 		{"[::1]:41112", false},
 	} {

@@ -11,6 +11,7 @@ import (
 // Tailscale versions, and a field this build does not know is not an error.
 type statusWire struct {
 	BackendState string              `json:"BackendState"`
+	Self         peerWire            `json:"Self"`
 	Peer         map[string]peerWire `json:"Peer"`
 }
 
@@ -55,6 +56,20 @@ func decodeStatus(body []byte) (*Status, error) {
 			if key := normalise(ip); key != "" {
 				status.peers[key] = enrichment
 			}
+		}
+	}
+
+	// The vantage's own node is not in Peer; it is Self. It is recorded so a
+	// caller can stay silent about the host it is running on instead of
+	// reporting it as an unmatched peer. Written last, so self wins if the two
+	// lists ever overlap.
+	self := Enrichment{Self: true, Online: true}
+	if name := normalise(wire.Self.DNSName); name != "" {
+		status.peers[name] = self
+	}
+	for _, ip := range wire.Self.TailscaleIPs {
+		if key := normalise(ip); key != "" {
+			status.peers[key] = self
 		}
 	}
 	return status, nil

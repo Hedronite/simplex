@@ -27,7 +27,6 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -61,9 +60,12 @@ var (
 	ErrTooLarge = errors.New("tailscale: local daemon payload exceeded the size cap")
 )
 
-// Enrichment is what one matched peer contributes: three booleans and nothing
+// Enrichment is what one matched peer contributes: four booleans and nothing
 // else. No address, DNS name or key crosses this boundary.
 type Enrichment struct {
+	// Self marks the vantage's own node. A caller uses it to stay silent
+	// rather than report the vantage as an unmatched peer.
+	Self bool
 	// Online is the control plane's view of the peer.
 	Online bool
 	// Direct is true when the peer has a current address, which means traffic
@@ -113,13 +115,15 @@ func ValidateSocketPath(path string) error {
 	switch {
 	case path == "":
 		return errors.New("tailscale: socket path is empty")
-	case !filepath.IsAbs(path):
+	case !strings.HasPrefix(path, "/"):
+		// A relative path, a URL and a host:port all fail here.
 		return errors.New("tailscale: socket path must be absolute")
-	case strings.Contains(path, "://"):
-		return errors.New("tailscale: socket path must not be a URL")
-	}
-	if host, port, err := net.SplitHostPort(path); err == nil && host != "" && port != "" {
-		return errors.New("tailscale: socket path must not be a host and port")
+	case strings.HasPrefix(path, "//"):
+		// One leading slash, not two: `//` is implementation-defined and the
+		// config schema rejects it, so the client refuses it too.
+		return errors.New("tailscale: socket path must not start with a double slash")
+	case strings.IndexFunc(path, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0:
+		return errors.New("tailscale: socket path must not contain whitespace")
 	}
 	return nil
 }
