@@ -51,7 +51,7 @@ Classification and severity are separate layers, in this order and no other:
 
 ## 4. Reason codes
 
-Closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. `watchdog_only` and `peer_prometheus_*` are never emitted and are not a Simplex reason: alert state belongs to Augur.
+Closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. Alert-derived codes are never emitted by Simplex: alert state belongs to Augur, and a code describing a state Simplex cannot observe would be a lie in a closed enum.
 
 Each probed check carries exactly one **outcome** code, plus zero or one **verdict** code. The only check with no outcome code is one invalidated by a blind vantage, which carries `vantage_blind` alone. `reasons[]` is sorted bytewise ascending.
 
@@ -302,7 +302,7 @@ Every tracked text file is scanned in CI. The allowlist is exact; anything else 
 | `255.255.255.255` | broadcast literal, documentation |
 | the CIDR literal `100.64.0.0/10` | CGNAT range, needed by blind detection |
 
-- TEST-NET-1 (`192.0.2.0/24`), TEST-NET-2 (`198.51.100.0/24`) and TEST-NET-3 (`203.0.113.0/24`) are warnings, allowed only in docs and fixtures as placeholders.
+- The three TEST-NET blocks of RFC 5737 are warnings, allowed only in docs and fixtures as placeholders.
 - Everything else fails: other IPv4 and IPv6 literals, tailnet IPv6 prefixes, `*.ts.net` and `*.tailnet` names, `*.local`, `*.lan`, private keys, GitHub, cloud and Slack tokens, JWTs, bearer tokens, and `/Users/...` or `/home/...` paths.
 - Emails must end in `example.com`, `example.org` or `users.noreply.github.com`.
 - No tracked file whose base name contains `overlay`, except the overlay schema.
