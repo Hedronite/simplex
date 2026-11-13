@@ -35,6 +35,14 @@ count=0
 while IFS= read -r f; do
 	[ -n "$f" ] || continue
 
+	# 0. The prose contract has one home. A file named semantics.md anywhere
+	#    else is a copy that drifts (it already did once), so it fails.
+	lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+	case "$lower" in
+	semantics.md|*/semantics.md)
+		[ "$f" = "docs/semantics.md" ] || record "semantics.md is only allowed at docs/semantics.md: $f" ;;
+	esac
+
 	# 1. The overlay is private user data and never tracked. A tracked file fails
 	#    if its base name is simplex.overlay.yaml, ends in .overlay.yaml,
 	#    .overlay.yml or .overlay.json, or is exactly overlay.yaml, overlay.yml
