@@ -73,9 +73,9 @@ check against it and is quiet when the config is valid.
 
 ```console
 $ simplex version
-simplex dev
+simplex dev (commit unknown, built unknown)
 $ simplex version --json
-{"version":"dev","commit":"none","built":"unknown"}
+{"version":"dev","commit":"unknown","built":"unknown"}
 ```
 
 - `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.

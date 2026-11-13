@@ -13,11 +13,34 @@ func TestVersionPrintsOneLine(t *testing.T) {
 	if r.code != exitcode.Green {
 		t.Fatalf("exit %d, want 0", r.code)
 	}
-	if !strings.HasPrefix(r.stdout, "simplex ") || strings.Count(strings.TrimSuffix(r.stdout, "\n"), " ") != 1 {
-		t.Fatalf("want one line \"simplex <semver>\", got %q", r.stdout)
+	line := strings.TrimSuffix(r.stdout, "\n")
+	// A build without ldflags reports the fallbacks.
+	if !strings.HasPrefix(line, "simplex dev (commit unknown, built unknown)") {
+		t.Fatalf("want \"simplex <version> (commit <sha>, built <date>)\" with fallbacks, got %q", line)
+	}
+	if strings.Contains(line, "none") {
+		t.Fatalf("the commit fallback is unknown, got %q", line)
 	}
 	if r.stderr != "" {
 		t.Fatalf("version must be quiet on stderr, got %q", r.stderr)
+	}
+}
+
+func TestVersionJSONFallbacks(t *testing.T) {
+	r := invoke(t, upDeps(), "version", "--json")
+	if r.code != exitcode.Green {
+		t.Fatalf("exit %d, want 0", r.code)
+	}
+	var v struct {
+		Version string `json:"version"`
+		Commit  string `json:"commit"`
+		Built   string `json:"built"`
+	}
+	if err := json.Unmarshal([]byte(r.stdout), &v); err != nil {
+		t.Fatalf("stdout is not one JSON object: %q (%v)", r.stdout, err)
+	}
+	if v.Version != "dev" || v.Commit != "unknown" || v.Built != "unknown" {
+		t.Fatalf("want the dev, unknown, unknown fallbacks, got %+v", v)
 	}
 }
 

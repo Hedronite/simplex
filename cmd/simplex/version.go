@@ -8,10 +8,10 @@ import (
 )
 
 // Build stamps. Release builds override them with -ldflags; a build from
-// source without them reports the placeholders.
+// source without them reports the fallbacks.
 var (
 	version = "dev"
-	commit  = "none"
+	commit  = "unknown"
 	built   = "unknown"
 )
 
@@ -22,7 +22,9 @@ func newVersion() *cobra.Command {
 		Short: "Print the version",
 		Long: `Print the version.
 
-Human output is one line: simplex <semver>. --json prints one object:
+Human output is one line: simplex <version> (commit <sha>, built <date>).
+A build from source without ldflags reports dev, unknown, unknown.
+--json prints one object with the same fields:
     {"version": "...", "commit": "...", "built": "..."}
 Always exits 0.`,
 		Args: noArgs,
@@ -43,7 +45,7 @@ Always exits 0.`,
 				}
 				return nil
 			}
-			if _, err := fmt.Fprintf(w, "simplex %s\n", version); err != nil {
+			if _, err := fmt.Fprintf(w, "simplex %s (commit %s, built %s)\n", version, commit, built); err != nil {
 				return fmt.Errorf("write version to stdout: %w", err)
 			}
 			return nil
