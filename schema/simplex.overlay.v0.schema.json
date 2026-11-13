@@ -36,6 +36,15 @@
               "type": "object",
               "additionalProperties": false,
               "required": ["kind"],
+              "allOf": [
+                {
+                  "if": {
+                    "required": ["kind"],
+                    "properties": {"kind": {"const": "prom_up"}}
+                  },
+                  "else": {"not": {"required": ["path"]}}
+                }
+              ],
               "properties": {
                 "kind": {
                   "enum": ["ts_reach", "lan_reach", "node_exporter", "prom_up", "kube_apiserver", "ssh"]
