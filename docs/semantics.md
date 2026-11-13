@@ -82,6 +82,23 @@ Evaluated per check, in this order. The first rule that matches decides the seve
 
 An unexpected `node_exporter` that is not up is YELLOW, never RED on its own. A held `prom_up` check is outside the pair, so held plus down never fires the pair rule.
 
+### Combination rows
+
+Pinned so the order cannot be guessed. First matching rule of the list above; pair pass not shown.
+
+| Expected | Result | Outcome code | Verdict | Severity |
+| --- | --- | --- | --- | --- |
+| dark | up | none (200) | `unexpected_light` | YELLOW |
+| dark | up | `prom_not_ready` (503 on `/-/ready` counts as up) | `unexpected_light` | YELLOW |
+| dark | up | `prom_auth` | `unexpected_light` | YELLOW |
+| dark | not up | `http_timeout` | `expected_dark` | GREEN |
+| light | up | `tcp_connect_refused` (a `ts_reach` refusal is up) | none | GREEN |
+| light | up | `metrics_body_unexpected` | none | YELLOW |
+| light | down | `http_unexpected_status` | `unexpected_dark` | YELLOW |
+| light | unknown | `tcp_connect_timeout` | `probe_unknown` | YELLOW |
+| any | any | any | `held` | GREEN |
+| any | unknown | none (`vantage_blind` alone) | `vantage_blind` | RED |
+
 ## 6. Derivation
 
 - `hosts[].severity` is the worst severity among that host's checks.
@@ -129,6 +146,17 @@ holds:
     reason: planned reboot   # required, scrubbed in CI
     until: 2026-11-20T00:00:00Z  # RFC 3339, required
 ```
+
+| Field | Required | Rule |
+| --- | --- | --- |
+| `apiVersion` | yes | `const simplex.config/v0` |
+| `vantage.id` | yes | slug |
+| `vantage.canaries` | no | check references; each names a configured `ts_reach` check |
+| `hosts[]` | yes | each `id` unique; a host with no checks is allowed and produces no `hosts[]` entry in the document |
+| `hosts[].checks[]` | no | `kind` and `expected` required; `port` and `path` optional |
+| `holds[]` | no | `host`, `kind`, `reason`, `until` all required |
+
+`example.yaml` in the repo root is a config document with public slugs only. It validates against the config schema in CI.
 
 Overlay (`simplex.overlay/v0`): public shape, private values, never tracked (`simplex.overlay.yaml`, `*.overlay.yaml`). Path from `--overlay` or `SIMPLEX_OVERLAY`. Keyed by host slug.
 
@@ -196,14 +224,31 @@ Consumers such as Vigil read the document from a file and never run `simplex`.
 
 S1 tests for `--out`: the temp file is in the target directory; the target is replaced by rename, never truncated in place; a prior good file is byte-identical after an exit 3 or 4 run; exit 5 writes a document with `vantage.status: blind`; mode is `0644`; no temp file remains after success or failure; `serve --out` writes the bytes the `/metrics` snapshot was built from.
 
-## 12. CLI contract
+## 12. CLI contract (frozen parts)
 
-*To be written by the CLI slice: table columns and truncation, `--help` bar, `validate` output, `version` output, error message style, global flags.*
+The rest of this section belongs to the CLI slice.
+
+- Commands: `check`, `validate`, `serve`, `version`. Global flags: `--config`, `--overlay`, `--json`, `--now`, `--out`.
+- `check` prints the table by default; `--json` prints the `simplex.probe/v0` document. Exit codes are identical in both modes.
+- Table columns, in order: `HOST | CHECK | EXPECTED | RESULT | SEVERITY | REASONS`. Reasons are joined with `, ` and truncated to `+N` when the column would overflow. `NO_COLOR` disables color; severity is never carried by color alone.
+- `validate` prints `path[idx].field: message (config line)`, exit `0` with warnings, `3` with errors.
 
 ## 13. Naming freeze
 
 Frozen at S0: commands `check`, `validate`, `serve`, `version`; flags `--json`, `--now`, `--out`, `--config`, `--overlay`; schema file names; document and config field names; the check kinds and reason codes above; the `simplex_` metric prefix. Changes after S1 are breaking.
 
-## 14. Public tree scrub
+## 14. Public-tree scrub
 
-CI scrubs every tracked text file for IPv4 and IPv6 addresses, tailnet and local names (`*.ts.net`, `*.local`), keys, tokens, absolute home paths and tracked overlay files. The address allowlist is exactly `127.0.0.0/8`, `0.0.0.0`, `255.255.255.255` and the literal `100.64.0.0/10` (blind detection and `/metrics` need them). Documentation-range addresses (TEST-NET) warn. Everything else fails.
+Every tracked text file is scanned in CI. The allowlist is exact; anything else fails the job.
+
+| Allowed | Why |
+| --- | --- |
+| `127.0.0.0/8` (any 127.x address) | loopback, in tests and the loopback listen default |
+| `0.0.0.0` | wildcard bind, mentioned only to forbid it |
+| `255.255.255.255` | broadcast literal, documentation |
+| the CIDR literal `100.64.0.0/10` | CGNAT range, needed by blind detection |
+
+- The three TEST-NET blocks of RFC 5737 are warnings, allowed only in docs and fixtures as placeholders.
+- Everything else fails: other IPv4 and IPv6 literals, `*.ts.net` and `*.tailnet` names, `*.local`, `*.lan`, private keys, GitHub, cloud and Slack tokens, JWTs, bearer tokens, and `/Users/...` or `/home/...` paths.
+- Emails must end in `example.com`, `example.org` or `users.noreply.github.com`.
+- No tracked file whose base name contains `overlay`, except the overlay schema.

@@ -104,14 +104,14 @@ const (
 
 // Reason codes.
 const (
-	ReasonTCPConnectOK         Reason = "tcp_connect_ok"
-	ReasonTCPConnectRefused    Reason = "tcp_connect_refused"
-	ReasonTCPConnectTimeout    Reason = "tcp_connect_timeout"
-	ReasonHTTPTimeout          Reason = "http_timeout"
+	ReasonTCPConnectOK        Reason = "tcp_connect_ok"
+	ReasonTCPConnectRefused   Reason = "tcp_connect_refused"
+	ReasonTCPConnectTimeout   Reason = "tcp_connect_timeout"
+	ReasonHTTPTimeout         Reason = "http_timeout"
 	ReasonHTTPUnexpectedStatus Reason = "http_unexpected_status"
-	ReasonPromNotReady         Reason = "prom_not_ready"
-	ReasonPromAuth             Reason = "prom_auth"
-	ReasonMetricsBodyBad       Reason = "metrics_body_unexpected"
+	ReasonPromNotReady        Reason = "prom_not_ready"
+	ReasonPromAuth            Reason = "prom_auth"
+	ReasonMetricsBodyBad      Reason = "metrics_body_unexpected"
 
 	ReasonExpectedDark    Reason = "expected_dark"
 	ReasonUnexpectedLight Reason = "unexpected_light"
