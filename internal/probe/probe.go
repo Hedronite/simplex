@@ -192,9 +192,7 @@ func (r *Runner) Run(ctx context.Context, instances []Instance) []Observation {
 		// Take a permit only if the run is still live. A permit released by an
 		// in-flight probe after the deadline would otherwise let the loop start
 		// work whose budget is already spent.
-		select {
-		case sem <- struct{}{}:
-		case <-runCtx.Done():
+		if !acquire(runCtx, sem) {
 			out[i] = Observation{Host: inst.Host, Kind: inst.Kind, Target: inst.Target, Result: contract.ResultUnknown}
 			continue
 		}
@@ -207,6 +205,23 @@ func (r *Runner) Run(ctx context.Context, instances []Instance) []Observation {
 	}
 	wg.Wait()
 	return out
+}
+
+// acquire takes a pool permit, or reports that the run is over. The check is
+// repeated after the permit arrives: when the deadline fires, a free permit and
+// a cancelled context can both be ready, and select may pick the permit, which
+// would start a probe whose budget is already spent.
+func acquire(ctx context.Context, sem chan struct{}) bool {
+	select {
+	case sem <- struct{}{}:
+		if ctx.Err() != nil {
+			<-sem
+			return false
+		}
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // probe runs one instance, retrying once after a timeout.
