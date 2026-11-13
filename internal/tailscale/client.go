@@ -112,20 +112,37 @@ type Client struct {
 // host:port is a configuration error: this slice speaks to a unix socket, and a
 // remote endpoint must never be guessed from a string.
 func ValidateSocketPath(path string) error {
+	// The shape is the config schema's pattern, character for character:
+	// `^/[^/\s][^\s]*$` — one leading slash, a second byte that is neither a
+	// slash nor whitespace, and no whitespace anywhere after it. Writing it out
+	// this way keeps the two definitions the same rule instead of two
+	// approximations that drift.
 	switch {
 	case path == "":
 		return errors.New("tailscale: socket path is empty")
 	case !strings.HasPrefix(path, "/"):
 		// A relative path, a URL and a host:port all fail here.
 		return errors.New("tailscale: socket path must be absolute")
+	case len(path) == 1:
+		return errors.New("tailscale: socket path must name a file, not the root")
 	case strings.HasPrefix(path, "//"):
-		// One leading slash, not two: `//` is implementation-defined and the
-		// config schema rejects it, so the client refuses it too.
 		return errors.New("tailscale: socket path must not start with a double slash")
-	case strings.IndexFunc(path, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0:
+	case isSpace(rune(path[1])):
+		return errors.New("tailscale: socket path must not start with whitespace")
+	case strings.IndexFunc(path, isSpace) >= 0:
 		return errors.New("tailscale: socket path must not contain whitespace")
 	}
 	return nil
+}
+
+// isSpace matches the \s of the schema pattern: space, tab, newline, carriage
+// return, form feed and vertical tab.
+func isSpace(r rune) bool {
+	switch r {
+	case ' ', '\t', '\n', '\r', '\f', '\v':
+		return true
+	}
+	return false
 }
 
 // New returns a client for the daemon at path. The path is validated here as

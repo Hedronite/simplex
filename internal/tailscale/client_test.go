@@ -409,6 +409,12 @@ func TestSocketPathValidation(t *testing.T) {
 		{"//var/run/tailscale/tailscaled.sock", false},
 		{"/var/run/tailscale//tailscaled.sock", true},
 		{"/var/run/ts sock/tailscaled.sock", false},
+		// The schema pattern is ^/[^/\s][^\s]*$; these are the shapes it
+		// rejects beyond the obvious ones, and the validator must agree.
+		{"/", false},
+		{"//", false},
+		{"/ var/run/tailscale/tailscaled.sock", false},
+		{"/var/run/tailscale/tailscaled.sock\t", false},
 		{"example:41112", false},
 		{"[::1]:41112", false},
 	} {
