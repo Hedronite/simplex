@@ -1,0 +1,7 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+hosts:
+  - id: tower
+    checks:
+      - {kind: kube_apiserver, expected: dark}

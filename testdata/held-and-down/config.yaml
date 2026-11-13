@@ -1,0 +1,12 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+hosts:
+  - id: box
+    checks:
+      - {kind: node_exporter, expected: light}
+holds:
+  - host: box
+    kind: node_exporter
+    reason: exporter migration
+    until: 2027-01-01T00:00:00Z

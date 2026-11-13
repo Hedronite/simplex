@@ -1,0 +1,16 @@
+{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {"id": "lathe", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [
+    {"id": "box", "severity": "GREEN", "reasons": []},
+    {"id": "lathe", "severity": "GREEN", "reasons": []}
+  ],
+  "checks": [
+    {"host": "box", "kind": "prom_up", "target": ":9090/metrics", "result": "up",
+     "severity": "GREEN", "expected": "light", "reasons": []},
+    {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
+     "severity": "GREEN", "expected": "light", "reasons": []}
+  ]
+}

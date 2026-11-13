@@ -1,0 +1,15 @@
+{
+  "apiVersion": "simplex.overlay/v0",
+  "hosts": {
+    "box": {
+      "address": "placeholder.invalid",
+      "overrides": [
+        {
+          "kind": "prom_up",
+          "path": "/metrics"
+        }
+      ],
+      "hostname": "x"
+    }
+  }
+}
