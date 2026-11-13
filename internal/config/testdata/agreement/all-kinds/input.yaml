@@ -1,0 +1,14 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}
+      - {kind: lan_reach, expected: light}
+      - {kind: node_exporter, expected: light}
+      - {kind: kube_apiserver, expected: dark}
+      - {kind: ssh, expected: light}
+  - id: box
+    checks:
+      - {kind: prom_up, expected: light, path: /metrics}

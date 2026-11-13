@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("apiVersion: simplex.config/v0\nvantage: {id: lathe, canaries: [{host: tower, kind: ts_reach, target: \":9100\"}]}\nhosts: [{id: tower, checks: [{kind: ts_reach, expected: light}]}]\n")

@@ -1,0 +1,9 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+  canaries:
+    - {host: tower, kind: ts_reach, target: ":9100"}
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}
