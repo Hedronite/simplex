@@ -154,11 +154,15 @@ wait_http "http://127.0.0.1:$GRAFANA_PORT/api/health" 90
 
 # A pinned image that rewrites its own plugins at startup is not pinned. This
 # fails the job rather than letting a differential version ride along.
-if docker logs simplex-grafana 2>&1 |
-	grep -Eqi 'installing plugin|downloading plugin|plugin .*(was |is )?updated|auto-?updat'; then
-	docker logs simplex-grafana 2>&1 | grep -Ei 'installing plugin|downloading plugin|plugin .*(was |is )?updated|auto-?updat' | head -10 >&2
+PLUGIN_ACTION='installing plugin|downloading plugin|updating plugin|installed plugin|plugin [^ ]* (was )?updated to'
+if docker logs simplex-grafana 2>&1 | grep -Eqi "$PLUGIN_ACTION"; then
+	docker logs simplex-grafana 2>&1 | grep -Ei "$PLUGIN_ACTION" | head -10 >&2
 	fail "Grafana installed or updated a plugin at startup; the image is not deterministic"
 fi
+# The checker logs its flag every start; that line is the evidence the settings
+# took hold, so a run without it means the settings were lost.
+docker logs simplex-grafana 2>&1 | grep -qi 'FlagKey:pluginsAutoUpdate' ||
+	fail "Grafana did not report the pluginsAutoUpdate flag; preinstall_auto_update was not applied"
 
 note "the dashboard is served under its frozen uid, from the provider path $DASH_DIR"
 curl -fsS -u "admin:throwaway-ci-only" \
