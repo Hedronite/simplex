@@ -159,10 +159,10 @@ if docker logs simplex-grafana 2>&1 | grep -Eqi "$PLUGIN_ACTION"; then
 	docker logs simplex-grafana 2>&1 | grep -Ei "$PLUGIN_ACTION" | head -10 >&2
 	fail "Grafana installed or updated a plugin at startup; the image is not deterministic"
 fi
-# The checker logs its flag every start; that line is the evidence the settings
-# took hold, so a run without it means the settings were lost.
-docker logs simplex-grafana 2>&1 | grep -qi 'FlagKey:pluginsAutoUpdate' ||
-	fail "Grafana did not report the pluginsAutoUpdate flag; preinstall_auto_update was not applied"
+# preinstall_disabled removes the update checker entirely, which is why this job
+# looks for plugin *actions* rather than for the checker's flag line: with the
+# setting in force there is no line to find, and finding one would mean the
+# setting had been lost.
 
 note "the dashboard is served under its frozen uid, from the provider path $DASH_DIR"
 curl -fsS -u "admin:throwaway-ci-only" \
