@@ -157,14 +157,15 @@ var fast = []string{"--interval", "80ms", "--deadline", "60ms"}
 func TestServeRefusesBadFlagsWithExitThree(t *testing.T) {
 	cfg, ov := serveFiles(t, sentinelAddr)
 	cases := map[string][]string{
-		"zero interval":            {"serve", "--config", cfg, "--overlay", ov, "--interval", "0s"},
-		"deadline beyond interval": {"serve", "--config", cfg, "--overlay", ov, "--interval", "1s", "--deadline", "2s"},
-		"malformed listen":         {"serve", "--config", cfg, "--overlay", ov, "--listen", "nonsense"},
-		"wildcard needs the flag":  {"serve", "--config", cfg, "--overlay", ov, "--listen", "0.0.0.0:0"},
-		"ipv6 wildcard":            {"serve", "--config", cfg, "--overlay", ov, "--listen", "[::]:0"},
-		"documentation address":    {"serve", "--config", cfg, "--overlay", ov, "--listen", "192.0.2.1:0"},
-		"a name that is not local": {"serve", "--config", cfg, "--overlay", ov, "--listen", "metrics.example:0"},
-		"stray argument":           {"serve", "--config", cfg, "--overlay", ov, "stray"},
+		"zero interval":                {"serve", "--config", cfg, "--overlay", ov, "--interval", "0s"},
+		"deadline beyond interval":     {"serve", "--config", cfg, "--overlay", ov, "--interval", "1s", "--deadline", "2s"},
+		"malformed listen":             {"serve", "--config", cfg, "--overlay", ov, "--listen", "nonsense"},
+		"wildcard needs the flag":      {"serve", "--config", cfg, "--overlay", ov, "--listen", "0.0.0.0:0"},
+		"empty host is all interfaces": {"serve", "--config", cfg, "--overlay", ov, "--listen", ":0"},
+		"ipv6 wildcard":                {"serve", "--config", cfg, "--overlay", ov, "--listen", "[::]:0"},
+		"documentation address":        {"serve", "--config", cfg, "--overlay", ov, "--listen", "192.0.2.1:0"},
+		"a name that is not local":     {"serve", "--config", cfg, "--overlay", ov, "--listen", "metrics.example:0"},
+		"stray argument":               {"serve", "--config", cfg, "--overlay", ov, "stray"},
 	}
 	for name, args := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -188,7 +189,7 @@ func TestServeAcceptsLoopbackForms(t *testing.T) {
 			t.Errorf("%s: allowed=%v err=%v", l, ok, err)
 		}
 	}
-	for _, l := range []string{"0.0.0.0:0", "[::]:0", "192.0.2.1:80", "metrics.example:80"} {
+	for _, l := range []string{"0.0.0.0:0", "[::]:0", ":10081", ":0", "192.0.2.1:80", "metrics.example:80"} {
 		ok, err := listenAllowed(l)
 		if err != nil || ok {
 			t.Errorf("%s: allowed=%v err=%v, want refused", l, ok, err)
