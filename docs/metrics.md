@@ -24,7 +24,7 @@ and a tracked-file scrub plus a label scrub test keep it that way.
 | `simplex_host_severity` | `host` | same scale, one series per host |
 | `simplex_check_severity` | `host`, `kind`, `target` | same scale, one series per check |
 | `simplex_check_result` | `host`, `kind`, `target`, `result` | one-hot over `up`, `down`, `unknown` |
-| `simplex_check_reason` | `host`, `kind`, `target`, `reason` | one-hot over all 16 frozen reason codes for **every** check: 1 when the check carries the code, 0 otherwise |
+| `simplex_check_reason` | `host`, `kind`, `target`, `reason` | one-hot over all 21 frozen reason codes for **every** check: 1 when the check carries the code, 0 otherwise |
 | `simplex_last_run_timestamp_seconds` | none | end of the last completed run, Unix seconds |
 | `simplex_document_age_seconds` | none | now minus the snapshot's `generated_at`, computed at scrape |
 | `simplex_run_duration_seconds` | none | duration of the last completed run |
@@ -41,7 +41,7 @@ Rulings baked into this table:
   an unknown code can never become a label.
 - `simplex_check_reason` is driven by the frozen enum even if a document
   carried a code the contract does not know: the label space cannot grow past
-  the sixteen codes.
+  the 21 codes.
 
 ## Cardinality
 
@@ -51,12 +51,12 @@ Per snapshot:
 - 1 overall series.
 - 3 vantage one-hot series.
 - 1 series per host.
-- 20 series per check: 1 severity + 3 result one-hot + 16 reason one-hot.
+- 25 series per check: 1 severity + 3 result one-hot + 21 reason one-hot (the 16 codes of S0 and the five enrichment codes of S3).
 - plus `simplex_last_run_timestamp_seconds`, `simplex_document_age_seconds`,
   `simplex_run_duration_seconds` and `simplex_run_errors_total`.
 
-The per-check block is the 20 the formula promises; a run with three hosts and
-five checks exports 1 + 1 + 3 + 3 + 100 + 4 = 112 series.
+The per-check block is the 25 the formula promises; a run with three hosts and
+five checks exports 1 + 1 + 3 + 3 + 125 + 4 = 137 series.
 
 ## Cold start
 

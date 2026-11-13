@@ -75,6 +75,25 @@ type Config struct {
 	Vantage    Vantage
 	Hosts      []Host
 	Holds      []Hold
+	Tailscale  Tailscale
+}
+
+// Tailscale is the optional LocalAPI enrichment block. The zero value means
+// enrichment is off.
+type Tailscale struct {
+	// LocalAPI turns enrichment on.
+	LocalAPI bool
+	// Socket is the absolute LocalAPI socket path; empty means the default.
+	Socket string
+	Line   int
+}
+
+// SocketPath returns the configured socket, or the default when none is set.
+func (t Tailscale) SocketPath() string {
+	if t.Socket != "" {
+		return t.Socket
+	}
+	return contract.DefaultTailscaleSocket
 }
 
 // Vantage is the run's own identity and the checks that vouch for it.
@@ -292,8 +311,8 @@ func parse(data []byte, now func() time.Time) (*Config, []Finding, error) {
 	// First pass, in file order: split the top-level pairs into known
 	// and unknown. Unknown keys are errors immediately; known keys are
 	// parsed in file order so findings read the way the file does.
-	var vantageNode, hostsNode, holdsNode *yaml.Node
-	var vantageKey, hostsKey, holdsKey int
+	var vantageNode, hostsNode, holdsNode, tailscaleNode *yaml.Node
+	var vantageKey, hostsKey, holdsKey, tailscaleKey int
 	seen := map[string]bool{}
 	for i := 0; i+1 < len(top.Content); i += 2 {
 		key, val := top.Content[i], top.Content[i+1]
@@ -312,6 +331,8 @@ func parse(data []byte, now func() time.Time) (*Config, []Finding, error) {
 			hostsNode, hostsKey = val, key.Line
 		case "holds":
 			holdsNode, holdsKey = val, key.Line
+		case "tailscale":
+			tailscaleNode, tailscaleKey = val, key.Line
 		default:
 			errAt(name, key.Line, "unknown key %q", name)
 		}
@@ -337,6 +358,10 @@ func parse(data []byte, now func() time.Time) (*Config, []Finding, error) {
 
 	if holdsNode != nil {
 		cfg.Holds = parseHolds(holdsNode, holdsKey, now, errAt, warnAt)
+	}
+
+	if tailscaleNode != nil {
+		cfg.Tailscale = parseTailscale(tailscaleNode, tailscaleKey, errAt)
 	}
 
 	if fs := validateRefs(cfg); len(fs) > 0 {
@@ -860,4 +885,54 @@ func lineOf(n *yaml.Node) int {
 		return 0
 	}
 	return n.Line
+}
+
+// parseTailscale reads the optional enrichment block. The socket must be an
+// absolute path: a host:port, a URL, a relative path or "//..." is an error, and
+// the error does not repeat the value.
+func parseTailscale(n *yaml.Node, line int, errAt errFunc) Tailscale {
+	var t Tailscale
+	n = deref(n)
+	if n == nil || n.Tag != "!!map" {
+		errAt("tailscale", line, "want a mapping, got %s", nodeDesc(n))
+		return t
+	}
+	t.Line = n.Line
+	seen := map[string]bool{}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		key, val := n.Content[i], n.Content[i+1]
+		name := key.Value
+		fpath := "tailscale." + name
+		if seen[name] {
+			errAt(fpath, key.Line, "duplicate key %q", name)
+			continue
+		}
+		seen[name] = true
+		switch name {
+		case "localapi":
+			v := deref(val)
+			if v == nil || v.Tag != "!!bool" {
+				errAt(fpath, key.Line, "want true or false, got %s", nodeDesc(v))
+				continue
+			}
+			t.LocalAPI = v.Value == "true"
+		case "socket":
+			t.Socket = parseString(val, fpath, errAt)
+			if t.Socket != "" && !absoluteSocketPath(t.Socket) {
+				errAt(fpath, key.Line, "want an absolute path to the socket (a host:port, a URL or a relative path is not allowed)")
+			}
+		default:
+			errAt(fpath, key.Line, "unknown key %q", name)
+		}
+	}
+	return t
+}
+
+// absoluteSocketPath reports whether p is an absolute filesystem path: it starts
+// with a single slash, names something below the root, and has no whitespace.
+func absoluteSocketPath(p string) bool {
+	if len(p) < 2 || p[0] != '/' || p[1] == '/' {
+		return false
+	}
+	return !strings.ContainsAny(p, " \t\r\n")
 }
