@@ -1,0 +1,19 @@
+# Provisioning for the Simplex dashboard. The file provider loads every
+# dashboard JSON under the standard dashboards directory, which is where this
+# repository's grafana/dashboards/simplex.json is placed on the host.
+# Seating the file there is a separate deployment decision; provisioning
+# config for an existing Grafana is all this slice ships.
+apiVersion: 1
+
+providers:
+  - name: simplex
+    orgId: 1
+    folder: Simplex
+    folderUid: simplex
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
