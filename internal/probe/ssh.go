@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"github.com/Hedronite/simplex/internal/contract"
@@ -43,8 +44,12 @@ func (o *Options) probeSSH(ctx context.Context, inst *Instance) (contract.Result
 		}
 		return contract.ResultDown, "", false
 	case err != nil:
-		// Fewer than four bytes arrived before the budget ended, so the
-		// prefix could not be decided either way. That is not a negative.
+		// Fewer than four bytes arrived before the budget ended, so the prefix
+		// could not be decided either way. That is not a negative, and a
+		// timeout is a timeout: it earns the one retry the runner allows.
+		if isTimeout(err) {
+			return contract.ResultUnknown, "", true
+		}
 		return contract.ResultUnknown, "", false
 	case len(banner) == 0:
 		// Connected, then closed without a word.
@@ -54,6 +59,16 @@ func (o *Options) probeSSH(ctx context.Context, inst *Instance) (contract.Result
 		// banner, and no more is coming.
 		return contract.ResultDown, "", false
 	}
+}
+
+// isTimeout reports whether a read failed because its budget ran out, rather
+// than because the peer closed or reset the connection.
+func isTimeout(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	return errors.Is(err, os.ErrDeadlineExceeded)
 }
 
 // readBanner reads at most bannerLimit bytes of the banner and returns as soon

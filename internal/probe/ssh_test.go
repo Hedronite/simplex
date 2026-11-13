@@ -85,7 +85,7 @@ func TestSSHBannerReads(t *testing.T) {
 			name:    "silence is unknown with no outcome code",
 			result:  contract.ResultUnknown,
 			outcome: "",
-			dials:   1,
+			dials:   2,
 			port: func(t *testing.T) int {
 				return startSSHPeer(t, func(conn net.Conn) {
 					// Say nothing and hold the connection past the budget.
@@ -97,7 +97,7 @@ func TestSSHBannerReads(t *testing.T) {
 			name:    "a short banner cut off by the budget is unknown",
 			result:  contract.ResultUnknown,
 			outcome: "",
-			dials:   1,
+			dials:   2,
 			port: func(t *testing.T) int {
 				return startSSHPeer(t, func(conn net.Conn) {
 					// Two bytes, then nothing: the prefix cannot be decided.
@@ -157,7 +157,7 @@ func TestSSHBannerReads(t *testing.T) {
 				t.Fatalf("got (%s, %q), want (%s, %q)", obs[0].Result, obs[0].Outcome, tc.result, tc.outcome)
 			}
 			if got := dials.Load(); got != tc.dials {
-				t.Fatalf("dialled %d times, want %d: only a connect timeout is retried", got, tc.dials)
+				t.Fatalf("dialled %d times, want %d: a timeout earns exactly one retry", got, tc.dials)
 			}
 		})
 	}

@@ -2,7 +2,10 @@ package probe
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -111,6 +114,131 @@ func TestDispatchStopsAtTheRunDeadline(t *testing.T) {
 			if o.Result != contract.ResultUnknown {
 				t.Fatalf("observation %d: got %s, want unknown once the run is over", i, o.Result)
 			}
+		}
+	})
+}
+
+// scriptConn serves scripted bytes, then blocks until its read deadline and
+// reports it. It is the seam a real socket cannot be inside a synthetic clock:
+// a real deadline would be a wall-clock instant the fake clock never reaches.
+type scriptConn struct {
+	mu       sync.Mutex
+	data     []byte
+	deadline time.Time
+	writes   int
+}
+
+func newScriptConn(data string) *scriptConn { return &scriptConn{data: []byte(data)} }
+
+func (c *scriptConn) Read(p []byte) (int, error) {
+	c.mu.Lock()
+	if len(c.data) > 0 {
+		n := copy(p, c.data)
+		c.data = c.data[n:]
+		c.mu.Unlock()
+		return n, nil
+	}
+	deadline := c.deadline
+	c.mu.Unlock()
+	if deadline.IsZero() {
+		return 0, os.ErrDeadlineExceeded
+	}
+	// Virtual under synctest: the test costs no wall time.
+	time.Sleep(time.Until(deadline))
+	if time.Now().Before(deadline) {
+		return 0, os.ErrDeadlineExceeded
+	}
+	return 0, os.ErrDeadlineExceeded
+}
+
+func (c *scriptConn) Write([]byte) (int, error) {
+	c.mu.Lock()
+	c.writes++
+	c.mu.Unlock()
+	return 0, errors.New("probe must never write")
+}
+
+func (c *scriptConn) Close() error { return nil }
+
+func (c *scriptConn) LocalAddr() net.Addr  { return scriptAddr{} }
+func (c *scriptConn) RemoteAddr() net.Addr { return scriptAddr{} }
+
+func (c *scriptConn) SetDeadline(t time.Time) error    { return c.SetReadDeadline(t) }
+func (c *scriptConn) SetWriteDeadline(time.Time) error { return nil }
+func (c *scriptConn) SetReadDeadline(t time.Time) error {
+	c.mu.Lock()
+	c.deadline = t
+	c.mu.Unlock()
+	return nil
+}
+
+type scriptAddr struct{}
+
+func (scriptAddr) Network() string { return "script" }
+func (scriptAddr) String() string  { return "script" }
+
+// TestSSHBannerTimeoutIsRetried pins the retry rule for a banner read: a peer
+// that says nothing on the first attempt and identifies itself on the second
+// is up, and the run costs one attempt, the retry gap, and the second attempt.
+func TestSSHBannerTimeoutIsRetried(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var dials atomic.Int32
+		runner := New(&Options{
+			Timeout:    100 * time.Millisecond,
+			RetryDelay: 250 * time.Millisecond,
+			Dialer: dialFunc(func(context.Context, string, string) (net.Conn, error) {
+				if dials.Add(1) == 1 {
+					return newScriptConn(""), nil // silent
+				}
+				return newScriptConn("SSH-2.0-OpenSSH_9.6\r\n"), nil
+			}),
+		})
+		start := time.Now()
+		obs := runner.Run(context.Background(), []Instance{{
+			Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
+		}})
+		elapsed := time.Since(start)
+
+		if obs[0].Result != contract.ResultUp || obs[0].Outcome != contract.ReasonTCPConnectOK {
+			t.Fatalf("got (%s, %q), want (up, tcp_connect_ok) after the retry", obs[0].Result, obs[0].Outcome)
+		}
+		if got := dials.Load(); got != 2 {
+			t.Fatalf("dialled %d times, want one attempt and one retry", got)
+		}
+		if want := 100*time.Millisecond + 250*time.Millisecond; elapsed != want {
+			t.Fatalf("run took %v, want %v", elapsed, want)
+		}
+	})
+}
+
+// TestSSHBannerTimeoutTwiceIsUnknown pins the far side of the same rule: two
+// silent attempts leave the question open, cost exactly one retry, and carry
+// no outcome code.
+func TestSSHBannerTimeoutTwiceIsUnknown(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var dials atomic.Int32
+		runner := New(&Options{
+			Timeout:    100 * time.Millisecond,
+			RetryDelay: 250 * time.Millisecond,
+			Dialer: dialFunc(func(context.Context, string, string) (net.Conn, error) {
+				dials.Add(1)
+				return newScriptConn(""), nil
+			}),
+		})
+		start := time.Now()
+		obs := runner.Run(context.Background(), []Instance{{
+			Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
+		}})
+		elapsed := time.Since(start)
+
+		if obs[0].Result != contract.ResultUnknown || obs[0].Outcome != "" {
+			t.Fatalf("got (%s, %q), want unknown with no outcome code", obs[0].Result, obs[0].Outcome)
+		}
+		if got := dials.Load(); got != 2 {
+			t.Fatalf("dialled %d times, want one attempt and one retry, never a second retry", got)
+		}
+		if want := 2*100*time.Millisecond + 250*time.Millisecond; elapsed != want {
+			t.Fatalf("run took %v, want %v", elapsed, want)
 		}
 	})
 }
