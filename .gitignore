@@ -1,0 +1,16 @@
+# Build output
+/simplex
+/dist/
+*.test
+*.out.tmp
+
+# The private address overlay is never tracked. CI asserts this.
+simplex.overlay.yaml
+*.overlay.yaml
+*.overlay.json
+.simplex/
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
