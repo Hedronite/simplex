@@ -16,9 +16,10 @@ import (
 )
 
 type validateFlags struct {
-	config string
-	now    string
-	json   bool
+	config  string
+	overlay string
+	now     string
+	json    bool
 }
 
 func newValidate(deps *Deps) *cobra.Command {
@@ -28,6 +29,13 @@ func newValidate(deps *Deps) *cobra.Command {
 		Short: "Load and check the config and overlay without probing",
 		Long: `Load the config and the overlay, apply the cross-field rules and
 report every finding. Nothing is probed.
+
+The overlay resolves like check: --overlay, then $SIMPLEX_OVERLAY,
+then simplex.overlay.yaml when present. With a resolved overlay, every
+check is resolved against it; a missing slug or an unreadable overlay
+is an error. With no overlay path resolved, one warning is printed
+("no overlay found: addresses not checked") and the resolve step is
+skipped.
 
 Human output is one finding per line, in config order:
     path: message (line N)
@@ -42,6 +50,7 @@ error line still goes to stderr.`,
 	}
 	fl := cmd.Flags()
 	fl.StringVar(&f.config, "config", defaultConfig, "config file")
+	fl.StringVar(&f.overlay, "overlay", "", "overlay file (default: $"+overlayEnv+", then "+defaultOverlay+" when present)")
 	fl.StringVar(&f.now, "now", "", "pin the hold clock (RFC 3339); hold expiry uses it")
 	fl.BoolVar(&f.json, "json", false, "print the findings as one JSON document")
 	return cmd
@@ -56,31 +65,27 @@ func runValidate(f *validateFlags, deps *Deps, stdout, stderr io.Writer) error {
 	cfg, cfgFindings, lerr := config.LoadWithClock(f.config, func() time.Time { return now })
 	findings = append(findings, cfgFindings...)
 
-	// The overlay is checked through the same resolution order the check
-	// command uses. With no overlay file at all the overlay is empty, so
-	// resolve reports every host as missing its entry, exactly like the
-	// check command fails closed (docs/semantics.md section 8).
+	// The overlay resolves like check: --overlay, then $SIMPLEX_OVERLAY,
+	// then simplex.overlay.yaml when present. With a resolved path it is
+	// loaded and every check is resolved against it; a missing slug or an
+	// unreadable overlay is an error. With no overlay path at all,
+	// validate warns and skips the resolve step: a clean checkout cannot
+	// carry a private overlay.
 	overlayFile := ""
 	if lerr == nil && cfg != nil {
-		var ov *overlay.Overlay
-		if path, ok := overlayPath(deps.Getenv); ok {
+		if path := resolveOverlayPath(f.overlay, deps.Getenv); path != "" {
 			overlayFile = path
-			loaded, lerr2 := overlay.Load(path)
+			ov, lerr2 := overlay.Load(path)
 			if lerr2 != nil {
 				findings = append(findings, overlayFindings(lerr2)...)
-			} else {
-				ov = loaded
-			}
-		}
-		if ov != nil {
-			if _, rerr := ov.Resolve(cfg); rerr != nil {
+			} else if _, rerr := ov.Resolve(cfg); rerr != nil {
 				findings = append(findings, overlayFindings(rerr)...)
 			}
-		} else if overlayFile == "" {
-			empty := &overlay.Overlay{Hosts: map[string]overlay.Host{}}
-			if _, rerr := empty.Resolve(cfg); rerr != nil {
-				findings = append(findings, overlayFindings(rerr)...)
-			}
+		} else {
+			findings = append(findings, config.Finding{
+				Level:   config.LevelWarning,
+				Message: "no overlay found: addresses not checked",
+			})
 		}
 	}
 
@@ -94,11 +99,18 @@ func runValidate(f *validateFlags, deps *Deps, stdout, stderr io.Writer) error {
 		}
 	} else {
 		for i := range findings {
-			src := f.config
-			if overlayFile != "" && i >= len(cfgFindings) {
-				src = overlayFile
+			line := ""
+			if findings[i].Path == "" {
+				// File-level findings carry no path: print the message
+				// bare, so the no-overlay warning reads naturally.
+				line = findings[i].Message
+			} else {
+				src := f.config
+				if overlayFile != "" && i >= len(cfgFindings) {
+					src = overlayFile
+				}
+				line = describe(src, &findings[i])
 			}
-			line := describe(src, &findings[i])
 			if findings[i].Level == config.LevelWarning {
 				line = "warning: " + line
 			}
@@ -119,12 +131,13 @@ func runValidate(f *validateFlags, deps *Deps, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// overlayPath repeats the overlay resolution order the check command uses:
-// $SIMPLEX_OVERLAY, then simplex.overlay.yaml when it exists. No file means
-// nothing to check, which is not an error.
-func overlayPath(getenv func(string) string) (string, bool) {
-	path := ""
-	if getenv != nil {
+// resolveOverlayPath repeats the overlay resolution order the check
+// command uses: --overlay, then $SIMPLEX_OVERLAY, then
+// simplex.overlay.yaml when it exists. An empty result means no overlay
+// path was resolved at all.
+func resolveOverlayPath(flag string, getenv func(string) string) string {
+	path := flag
+	if path == "" && getenv != nil {
 		path = getenv(overlayEnv)
 	}
 	if path == "" {
@@ -132,7 +145,7 @@ func overlayPath(getenv func(string) string) (string, bool) {
 			path = defaultOverlay
 		}
 	}
-	return path, path != ""
+	return path
 }
 
 // overlayFindings flattens an overlay failure into the shared finding

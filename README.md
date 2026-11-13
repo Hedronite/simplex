@@ -55,14 +55,19 @@ $ echo $?
 ```
 
 `validate` loads and checks the config and overlay without probing; it prints
-one finding per line, exits 0 with warnings and 3 with errors. A clean config
-is quiet:
+one finding per line, exits 0 with warnings and 3 with errors. On a clean
+checkout there is no private overlay to read, so the addresses are not checked
+and validate says so:
 
 ```console
 $ simplex validate --config example.yaml
+warning: no overlay found: addresses not checked
 $ echo $?
 0
 ```
+
+With an overlay present (never committed), the same command resolves every
+check against it and is quiet when the config is valid.
 
 `version` prints one line, or a JSON object with `--json`:
 
