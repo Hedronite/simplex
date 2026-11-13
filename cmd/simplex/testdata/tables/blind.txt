@@ -1,0 +1,3 @@
+HOST   CHECK                  EXPECTED  RESULT   SEVERITY  REASONS
+box    prom_up :9090/-/ready  light     unknown  RED       vantage_blind
+lathe  prom_up :9090/-/ready  light     unknown  RED       vantage_blind

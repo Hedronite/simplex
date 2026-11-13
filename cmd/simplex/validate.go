@@ -57,17 +57,28 @@ func runValidate(f *validateFlags, deps *Deps, stdout, stderr io.Writer) error {
 	findings = append(findings, cfgFindings...)
 
 	// The overlay is checked through the same resolution order the check
-	// command uses. A missing overlay file is not by itself an error; a
-	// check that needs an address with no entry is, and resolve reports
-	// it naming every missing slug.
+	// command uses. With no overlay file at all the overlay is empty, so
+	// resolve reports every host as missing its entry, exactly like the
+	// check command fails closed (docs/semantics.md section 8).
 	overlayFile := ""
 	if lerr == nil && cfg != nil {
+		var ov *overlay.Overlay
 		if path, ok := overlayPath(deps.Getenv); ok {
 			overlayFile = path
-			ov, lerr2 := overlay.Load(path)
+			loaded, lerr2 := overlay.Load(path)
 			if lerr2 != nil {
 				findings = append(findings, overlayFindings(lerr2)...)
-			} else if _, rerr := ov.Resolve(cfg); rerr != nil {
+			} else {
+				ov = loaded
+			}
+		}
+		if ov != nil {
+			if _, rerr := ov.Resolve(cfg); rerr != nil {
+				findings = append(findings, overlayFindings(rerr)...)
+			}
+		} else if overlayFile == "" {
+			empty := &overlay.Overlay{Hosts: map[string]overlay.Host{}}
+			if _, rerr := empty.Resolve(cfg); rerr != nil {
 				findings = append(findings, overlayFindings(rerr)...)
 			}
 		}
@@ -91,7 +102,9 @@ func runValidate(f *validateFlags, deps *Deps, stdout, stderr io.Writer) error {
 			if findings[i].Level == config.LevelWarning {
 				line = "warning: " + line
 			}
-			fmt.Fprintln(stdout, line)
+			if _, err := fmt.Fprintln(stdout, line); err != nil {
+				return failure.Runtime(err, "write findings to stdout")
+			}
 		}
 	}
 

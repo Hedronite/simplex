@@ -28,9 +28,9 @@ func TestRenderGolden(t *testing.T) {
 			Reasons: []contract.Reason{contract.ReasonUnexpectedDark}},
 	})
 	want := "" +
-		"HOST  CHECK               EXPECTED  RESULT  SEVERITY  REASONS\n" +
-		"box   prom_up :9090      light     up      GREEN\n" +
-		"lathe  kube_apiserver :6443  dark     down    RED       unexpected_dark\n"
+		"HOST   CHECK                 EXPECTED  RESULT  SEVERITY  REASONS\n" +
+		"box    prom_up :9090         light     up      GREEN\n" +
+		"lathe  kube_apiserver :6443  dark      down    RED       unexpected_dark\n"
 	if got := Render(d, false); got != want {
 		t.Fatalf("golden table differs\n--- got\n%s--- want\n%s", quoteLines(got), quoteLines(want))
 	}
@@ -115,7 +115,8 @@ func TestRenderDeterministicAndColumnAligned(t *testing.T) {
 			Result: contract.ResultDown, Severity: contract.SeverityRed, Expected: contract.ExpectedDark,
 			Reasons: []contract.Reason{contract.ReasonUnexpectedDark}},
 	})
-	if Render(d, false) != Render(d, false) {
+	first, second := Render(d, false), Render(d, false)
+	if first != second {
 		t.Fatal("the same document rendered twice differs")
 	}
 	lines := strings.Split(strings.TrimSuffix(Render(d, false), "\n"), "\n")

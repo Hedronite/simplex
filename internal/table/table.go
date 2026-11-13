@@ -102,31 +102,27 @@ func Render(d *document.Document, color bool) string {
 
 	var b strings.Builder
 	writeRow := func(row [6]string, paint bool, severity contract.Severity) {
+		var line strings.Builder
 		for i, c := range row {
 			if i > 0 {
-				b.WriteString(gutter)
+				line.WriteString(gutter)
 			}
-			// The last column is never padded: trailing whitespace
-			// would only add noise to diffs.
-			last := i == len(row)-1
+			cell := c
 			if paint && i == 4 && color {
-				b.WriteString(severityColor(severity) + c + colorReset)
-				if last {
-					break
-				}
-				if pad := widths[i] - len(c); pad > 0 {
-					b.WriteString(strings.Repeat(" ", pad))
-				}
-				continue
+				cell = severityColor(severity) + c + colorReset
 			}
-			b.WriteString(c)
-			if !last {
+			line.WriteString(cell)
+			// Padding between columns uses the unpainted length, so the
+			// color codes never move a column boundary.
+			if i < len(row)-1 {
 				if pad := widths[i] - len(c); pad > 0 {
-					b.WriteString(strings.Repeat(" ", pad))
+					line.WriteString(strings.Repeat(" ", pad))
 				}
 			}
 		}
-		b.WriteString("\n")
+		// An empty last cell would otherwise leave the severity padding
+		// and the gutter as trailing noise on the line.
+		b.WriteString(strings.TrimRight(line.String(), " ") + "\n")
 	}
 
 	var header [6]string

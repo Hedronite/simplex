@@ -38,10 +38,14 @@ Always exits 0.`,
 					// Only three strings, so this cannot fail.
 					return fmt.Errorf("encode version: %w", err)
 				}
-				fmt.Fprintln(w, string(b))
+				if _, err := fmt.Fprintln(w, string(b)); err != nil {
+					return fmt.Errorf("write version to stdout: %w", err)
+				}
 				return nil
 			}
-			fmt.Fprintf(w, "simplex %s\n", version)
+			if _, err := fmt.Fprintf(w, "simplex %s\n", version); err != nil {
+				return fmt.Errorf("write version to stdout: %w", err)
+			}
 			return nil
 		},
 	}

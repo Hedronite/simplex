@@ -38,9 +38,41 @@ $ simplex validate --config example.yaml
 $ simplex serve --config example.yaml
 ```
 
-- `check` renders a human table by default; `--json` prints the
-  `simplex.probe/v0` document. Exit codes are identical in both modes.
-- `validate` loads and checks the config and overlay without probing.
+`check` renders the table by default; `--json` prints the `simplex.probe/v0`
+document. Exit codes are identical in both modes. The table from a machine with
+no route to the mesh (a blind vantage, exit 5 — not a mesh failure):
+
+```console
+$ simplex check --config example.yaml
+HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
+box    prom_up :9090/metrics        light     unknown  RED       vantage_blind
+lathe  prom_up :9090/-/ready        light     unknown  RED       vantage_blind
+tower  kube_apiserver :6443         dark      unknown  RED       vantage_blind
+tower  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
+tower  ts_reach :9100               light     unknown  RED       vantage_blind
+$ echo $?
+5
+```
+
+`validate` loads and checks the config and overlay without probing; it prints
+one finding per line, exits 0 with warnings and 3 with errors. A clean config
+is quiet:
+
+```console
+$ simplex validate --config example.yaml
+$ echo $?
+0
+```
+
+`version` prints one line, or a JSON object with `--json`:
+
+```console
+$ simplex version
+simplex dev
+$ simplex version --json
+{"version":"dev","commit":"none","built":"unknown"}
+```
+
 - `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
 - Releases are produced with reproducible builds; until then, build from source
   with Go 1.27 or newer.

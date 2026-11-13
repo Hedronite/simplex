@@ -152,7 +152,9 @@ func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.
 		// The table is a renderer of the same document; only the
 		// severity word is colored, and only on a terminal without
 		// NO_COLOR.
-		fmt.Fprint(stdout, table.Render(&doc, colorFor(stdout, deps.Getenv)))
+		if _, err := fmt.Fprint(stdout, table.Render(&doc, colorFor(stdout, deps.Getenv))); err != nil {
+			return failure.Runtime(err, "write table to stdout")
+		}
 	}
 	if code := severity.ExitCode(&doc); code != 0 {
 		return &statusExit{code: code}

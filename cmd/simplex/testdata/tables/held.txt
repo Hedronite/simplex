@@ -1,0 +1,2 @@
+HOST   CHECK           EXPECTED  RESULT  SEVERITY  REASONS
+tower  ts_reach :9100  light     up      GREEN     held, tcp_connect_ok

@@ -1,0 +1,2 @@
+HOST   CHECK           EXPECTED  RESULT   SEVERITY  REASONS
+tower  ts_reach :9100  light     unknown  YELLOW    probe_unknown, tcp_connect_timeout
