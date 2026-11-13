@@ -55,3 +55,12 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+
+  grafana:
+    name: grafana dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: provision the dashboard and query it
+        run: ./scripts/grafana-smoke.sh
