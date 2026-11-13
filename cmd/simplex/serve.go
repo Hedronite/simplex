@@ -208,7 +208,10 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 	// before serve returns and a caller can rebind it at once.
 	if !serveDone {
 		select {
-		case <-serveErr:
+		case err := <-serveErr:
+			if err != nil && !errors.Is(err, http.ErrServerClosed) && fatal == nil {
+				fatal = failure.Runtime(err, "serve: metrics server stopped")
+			}
 		case <-sctx.Done():
 		}
 	}
