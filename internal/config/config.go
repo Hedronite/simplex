@@ -230,7 +230,7 @@ func (cfg *Config) ActiveHolds() []Hold {
 }
 
 var slugPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
-var targetPattern = regexp.MustCompile(`^:[0-9]{1,5}(/[!-~]*)?$`)
+var targetPattern = regexp.MustCompile(`^:[0-9]{1,5}(/[\x21-\x7e]*)?$`)
 
 // Load reads the config file at path and parses it. A file that cannot be
 // read is a config error (exit 3), not a runtime error: the run cannot

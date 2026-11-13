@@ -418,7 +418,7 @@ func (o *Overlay) Resolve(cfg *config.Config) ([]Resolved, error) {
 }
 
 var slugPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
-var targetPattern = regexp.MustCompile(`^:[0-9]{1,5}(/[!-~]*)?$`)
+var targetPattern = regexp.MustCompile(`^:[0-9]{1,5}(/[\x21-\x7e]*)?$`)
 
 const allowedList = "/metrics, /-/ready, /-/healthy"
 
