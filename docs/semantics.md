@@ -21,14 +21,14 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 | `prom_up` | `GET <path>` on a Prometheus | 9090 | `:<port><path>` |
 | `kube_apiserver` | TCP connect over the tailnet | 6443 | `:<port>` |
 | `lan_reach` (provisional) | TCP connect over the LAN address | 22 | `:<port>` |
-| `ssh` (provisional) | TCP connect plus `SSH-` banner | 22 | `:<port>` |
+| `ssh` (provisional) | TCP connect over the tailnet, then read the banner | 22 | `:<port>` |
 
 - `expected` (`light` or `dark`) is **required on every check**, in config and in the document. There is no per-kind default.
 - Port 18080 is never dialed. Config load rejects any check that names it, and the dialer refuses it too.
 - `path` is legal only on `prom_up`, in config and in overlay overrides. A `path` on any other kind is a config error (exit `3`).
 - `prom_up` path comes from an allowlist: `/metrics`, `/-/ready`, `/-/healthy`; default `/-/ready`. HTTP only, host must be an overlay slug, no userinfo, no query, no redirects, 1 MiB body cap.
 - `kube_apiserver` is a TCP connect to `:6443` and nothing more: no TLS handshake, no HTTP request, no credentials. Another project owns TLS and everything above the connect, so a closed or filtered port is the only thing this kind can report.
-- `lan_reach` and `ssh` land in the third S1 slice. Their rows are intent. The kind names are frozen.
+- `lan_reach` and `ssh` land in the third S1 slice. Their rows are intent. The kind names are frozen. `ssh` dials the tailnet address only; the LAN path is the `lan_reach` kind, so one host never carries two checks with the same (kind, target). A `via` field for `ssh` would be a later minor addition.
 
 ## 3. Result classification
 
@@ -40,7 +40,7 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 | `node_exporter` | HTTP 200 | connect refused; HTTP 404 or 5xx | timeout, unreachable, DNS error |
 | `kube_apiserver` | connect accepted | connect refused | timeout, unreachable, DNS error |
 | `prom_up` | 200; 503 on `/-/ready`; 401 or 403; 200 on `/metrics` without `prometheus_build_info` in the first 64 KiB | connect refused; HTTP 404 or 5xx | timeout, unreachable, DNS error |
-| `ssh` (provisional) | banner starts with `SSH-` | connect refused; other banner | timeout, unreachable, DNS error |
+| `ssh` (provisional) | banner starts with `SSH-` (outcome `tcp_connect_ok`) | connect refused (`tcp_connect_refused`); a banner that does not start with `SSH-`, no outcome code | connect timeout (`tcp_connect_timeout`); connected but no banner within the probe budget, no outcome code; unreachable; DNS error |
 
 HTTP statuses: for `node_exporter` only 200 is up. For `prom_up`, the up statuses are the ones in the table; `prom_auth` and the readiness 503 (`prom_not_ready`) are `prom_up` codes and apply nowhere else. Any other HTTP status is `down` with `http_unexpected_status`. That includes 401 and 403 on `node_exporter`, 503 on `node_exporter` or on any `prom_up` path other than `/-/ready`, and 3xx on every kind, because redirects are not followed.
 
