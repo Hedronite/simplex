@@ -43,6 +43,11 @@ simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="pr
 simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="prom_pair_down"} 0
 simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="prom_pair_degraded"} 0
 simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="vantage_blind"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="ts_peer_online"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="ts_peer_offline"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="ts_peer_unmatched"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="ts_path_direct"} 0
+simplex_check_reason{host="box",kind="prom_up",target=":9090/metrics",reason="ts_path_relayed"} 0
 simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_ok"} 0
 simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_refused"} 0
 simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="tcp_connect_timeout"} 0
@@ -59,6 +64,11 @@ simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="
 simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="prom_pair_down"} 0
 simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="prom_pair_degraded"} 0
 simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="vantage_blind"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="ts_peer_online"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="ts_peer_offline"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="ts_peer_unmatched"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="ts_path_direct"} 0
+simplex_check_reason{host="lathe",kind="prom_up",target=":9090/-/ready",reason="ts_path_relayed"} 0
 # HELP simplex_last_run_timestamp_seconds End of the last completed run, in Unix seconds.
 # TYPE simplex_last_run_timestamp_seconds gauge
 simplex_last_run_timestamp_seconds 1794592802

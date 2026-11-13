@@ -421,6 +421,9 @@ func checkDocument(t *testing.T, doc document, cfg configFile, ov *overlayFile) 
 		if err := outcomeAgreement(c); err != nil {
 			t.Fatal(err)
 		}
+		if err := enrichmentAgreement(c); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Ordering: checks by (host, kind, target), hosts by id.

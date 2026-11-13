@@ -55,7 +55,8 @@ func TestSemanticsDocumentsEveryCode(t *testing.T) {
 	}
 }
 
-// The reason set is frozen at exactly these 16 codes.
+// The reason set is frozen at exactly these 21 codes: the 16 of S0 and the five
+// enrichment codes added at S3 (a minor change).
 func TestReasonSetIsFrozen(t *testing.T) {
 	want := []Reason{
 		"expected_dark", "unexpected_light", "unexpected_dark", "held",
@@ -63,6 +64,8 @@ func TestReasonSetIsFrozen(t *testing.T) {
 		"metrics_body_unexpected", "prom_pair_down", "prom_pair_degraded",
 		"tcp_connect_ok", "tcp_connect_refused", "tcp_connect_timeout",
 		"http_timeout", "http_unexpected_status",
+		"ts_peer_online", "ts_peer_offline", "ts_peer_unmatched",
+		"ts_path_direct", "ts_path_relayed",
 	}
 	got := map[Reason]bool{}
 	for _, c := range ReasonCodes() {

@@ -48,9 +48,9 @@ Retry: one retry after 250 ms, on timeout only. Never retry a refusal.
 
 ## 4. Reason codes
 
-Exactly 16 codes, closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. `watchdog_only`, `probe_timeout` and `peer_prometheus_*` are not Simplex codes.
+Exactly 21 codes, closed and snake_case: the 16 frozen at S0 and the five enrichment codes added at S3. Add a code is a minor change; remove or rename is breaking. `watchdog_only`, `probe_timeout` and `peer_prometheus_*` are not Simplex codes.
 
-An **outcome** code says what the probe saw. A **verdict** code says why the severity is what it is. Outcome codes are informational: they appear alongside a verdict code and never replace one. A check carries at most one outcome code. A healthy HTTP check (200, no body problem) carries none, and a failure with no transport detail (unreachable, DNS error) carries none. Under a blind vantage a check carries only `vantage_blind`. `checks[].reasons[]` is sorted bytewise ascending and has no duplicates. `hosts[].reasons[]` is not re-sorted: it follows the order in section 6.
+An **outcome** code says what the probe saw. A **verdict** code says why the severity is what it is. Outcome codes are informational: they appear alongside a verdict code and never replace one. A check carries at most one outcome code. A healthy HTTP check (200, no body problem) carries none, and a failure with no transport detail (unreachable, DNS error) carries none. Under a blind vantage a check carries only `vantage_blind`. An **enrichment** code (section 15) says what the local tailnet daemon knows about the peer of a `ts_reach` check; it is a separate class, never replaces or counts as an outcome code, and never changes a result or a severity. `checks[].reasons[]` is sorted bytewise ascending and has no duplicates. `hosts[].reasons[]` is not re-sorted: it follows the order in section 6.
 
 | Code | Class | Emitted when |
 | --- | --- | --- |
@@ -70,6 +70,11 @@ An **outcome** code says what the probe saw. A **verdict** code says why the sev
 | `prom_pair_down` | verdict | every non-held `prom_up` check is not up (two or more) |
 | `prom_pair_degraded` | verdict | some, not all, non-held `prom_up` checks are not up |
 | `vantage_blind` | blind | the vantage cannot see the mesh |
+| `ts_peer_online` | enrichment | the local tailnet daemon reports the peer online |
+| `ts_peer_offline` | enrichment | the daemon reports the peer offline |
+| `ts_peer_unmatched` | enrichment | the daemon's peer list has no entry for this host's address |
+| `ts_path_direct` | enrichment | traffic to the peer goes direct |
+| `ts_path_relayed` | enrichment | traffic to the peer goes through a relay |
 
 ## 5. Severity rules
 
@@ -151,6 +156,9 @@ holds:
     kind: ts_reach           # kind or "*"
     reason: planned reboot   # required, scrubbed in CI
     until: "2026-11-20T00:00:00Z"  # RFC 3339 string, required; quote it
+tailscale:                   # optional, off by default (section 15)
+  localapi: true
+  socket: /var/run/tailscale/tailscaled.sock   # absolute path only
 ```
 
 | Field | Required | Rule |
@@ -161,6 +169,7 @@ holds:
 | `hosts[]` | yes, at least 1 | each `id` unique |
 | `hosts[].checks[]` | yes, at least 1 | `kind` and `expected` required; `port` optional; `path` only on `prom_up` |
 | `holds[]` | no | `host`, `kind`, `reason`, `until` all required |
+| `tailscale` | no | when the block is present, `localapi` (boolean) is required; `socket` is optional (an absolute path, default the platform socket; a host:port, a URL, a relative path or a path starting `//` is a config error); see section 15 |
 
 `example.yaml` in the repo root is a config document with public slugs only. It validates against the config schema in CI.
 
@@ -326,3 +335,22 @@ Every tracked text file is scanned in CI. The allowlist is exact; anything else 
 - Emails must end in `example.com`, `example.org` or `users.noreply.github.com`.
 - `docs/semantics.md` is the only file allowed to be named `semantics.md`. A copy anywhere else fails, because a copy drifts from the contract.
 - A tracked file fails if its base name is `simplex.overlay.yaml`, ends in `.overlay.yaml`, `.overlay.yml` or `.overlay.json`, or is exactly `overlay.yaml`, `overlay.yml` or `overlay.json`, anywhere in the tree (test data included). Anything under `.simplex/` fails too. The overlay schema is allowed by its exact path. Code, tests and packages may use the word (`internal/overlay`); fixtures and fuzz seeds that carry overlay-shaped data use other names, such as `private.yaml` or `seed-*`. The address and hostname scrub above is unchanged and stays the second line of defence for overlay-shaped data under any name.
+
+## 15. Tailscale enrichment
+
+Optional, off by default, Linux unix socket only. A `ts_reach` connect says whether a port answered; the tailnet daemon on the vantage also knows whether the control plane thinks the peer is online and whether traffic goes direct or through a relay. With `tailscale: {localapi: true}` in the config, Simplex reads that and attaches it to each `ts_reach` check as reason codes.
+
+| Code | Group | Emitted when |
+| --- | --- | --- |
+| `ts_peer_online` | peer state | the peer is in the daemon's list and reported online |
+| `ts_peer_offline` | peer state | the peer is in the daemon's list and reported offline |
+| `ts_peer_unmatched` | peer state | no peer in the list matches this host's overlay address |
+| `ts_path_direct` | path | the peer is reported with a direct path |
+| `ts_path_relayed` | path | the peer has no direct path and is reported with a relay |
+
+- **Informational only.** Enrichment never changes `result`, `severity`, the rollup or the exit code. It explains a verdict; it never makes one. (Letting the daemon's state turn an `unknown` into a `down` is a separate, later contract decision.)
+- **Scope.** Only `ts_reach` checks carry the codes. A check carries at most one code from each group; an unmatched peer carries no path code, and an offline peer carries one only if the daemon still reports a path. `docs/metrics.md` exports all 21 reason codes per check as a one-hot, so these five appear as 0 or 1 on every check.
+- **Matching.** A peer is matched to a host by the host's overlay address, an IP literal or a DNS name (with or without a trailing dot, case-insensitive), compared in memory. The matched address and name are never copied into a document, a metric, a log or an error.
+- **Access model.** One request per run, `GET /localapi/v0/status`, with a constant path and method and no body, over a unix socket at the configured absolute path (default `/var/run/tailscale/tailscaled.sock`). No root, no capabilities, no `tailscale` command or any process execution, no mutating call, and the socket file is never created, chmodded, moved or removed. The request has a 2 s timeout inside the run deadline, so a slow daemon cannot hold a pass past it. The response is capped at 4 MiB, decoded into a minimal structure and reduced to booleans; no payload text reaches an error or a log.
+- **Fail soft.** If enrichment is enabled and the socket is missing, unreadable, slow, oversize or malformed, the run adds no enrichment codes, prints one warning by field path (`tailscale`), and otherwise runs as if the block were absent. It never fails the run.
+- **Not covered.** macOS desktop app variants, which expose a loopback port rather than a unix socket, stay on the plain `ts_reach`. Using `BackendState` to harden the vantage test is a later, separate decision.
