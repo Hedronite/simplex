@@ -31,6 +31,10 @@ type Deps struct {
 	Now func() time.Time
 	// Getenv reads the environment (SIMPLEX_OVERLAY).
 	Getenv func(string) string
+	// TailscaleSocket, when set, replaces the configured LocalAPI socket path.
+	// A test uses it to point enrichment at a fake daemon; the shipped binary
+	// never sets it.
+	TailscaleSocket string
 	// Ready, when set, is called by serve with the bound address once the
 	// listener is up. It exists so a test can bind port 0 and learn the port.
 	Ready func(net.Addr)

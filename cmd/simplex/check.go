@@ -73,7 +73,7 @@ func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.
 
 	res, err := check.Run(ctx,
 		&check.Params{Config: f.config, Overlay: f.overlay, Now: now},
-		&check.Deps{Runner: deps.Runner, Lister: deps.Lister, Getenv: deps.Getenv})
+		&check.Deps{Runner: deps.Runner, Lister: deps.Lister, Getenv: deps.Getenv, TailscaleSocket: deps.TailscaleSocket})
 	for i := range res.Warnings {
 		_, _ = fmt.Fprintf(stderr, "warning: %s\n", describe(f.config, &res.Warnings[i]))
 	}

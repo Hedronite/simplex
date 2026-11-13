@@ -1,0 +1,18 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+hosts:
+  - id: apiary
+    checks:
+      - {kind: ts_reach, expected: light}
+  - id: box
+    checks:
+      - {kind: ts_reach, expected: light}
+  - id: lathe
+    checks:
+      - {kind: ts_reach, expected: light}
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}
+tailscale:
+  localapi: true

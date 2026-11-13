@@ -76,6 +76,10 @@ type configFile struct {
 		Reason string `yaml:"reason"`
 		Until  string `yaml:"until"`
 	} `yaml:"holds"`
+	Tailscale *struct {
+		LocalAPI bool   `yaml:"localapi"`
+		Socket   string `yaml:"socket"`
+	} `yaml:"tailscale"`
 }
 
 type overlayFile struct {
@@ -204,6 +208,19 @@ func readExit(t *testing.T, dir string) int {
 		t.Fatalf("%s: exit file %q is not an integer", dir, strings.TrimSpace(string(raw)))
 	}
 	return code
+}
+
+// enrichmentReasons returns the codes whose contract class is enrichment.
+func enrichmentReasons(in []string) []string {
+	var out []string
+	for _, code := range in {
+		for _, spec := range contract.ReasonSpecs {
+			if string(spec.Code) == code && spec.Class == contract.ClassEnrichment {
+				out = append(out, code)
+			}
+		}
+	}
+	return out
 }
 
 // outcomeReasons returns the codes whose contract class is outcome.
@@ -497,6 +514,17 @@ func checkDocument(t *testing.T, doc document, cfg configFile, ov *overlayFile) 
 
 		var severity contract.Severity
 		reasons := append([]string(nil), outcomes...)
+		// Enrichment codes are informational: the rules neither add nor remove
+		// them, so the document's own are carried (enrichmentAgreement judges them),
+		// and only when the config turns enrichment on.
+		if enriched := enrichmentReasons(c.Reasons); len(enriched) > 0 {
+			if cfg.Tailscale == nil || !cfg.Tailscale.LocalAPI {
+				t.Fatalf("checks[%d]: enrichment codes %v but the config does not enable tailscale.localapi", i, enriched)
+			}
+			if !blind {
+				reasons = append(reasons, enriched...)
+			}
+		}
 		switch {
 		case blind:
 			if c.Result != string(contract.ResultUnknown) {
