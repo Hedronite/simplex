@@ -416,6 +416,13 @@ func impliedExit(doc document) int {
 func checkDocument(t *testing.T, doc document, cfg configFile, ov *overlayFile) {
 	t.Helper()
 
+	// Each result agrees with its kind and outcome code (semantics section 3).
+	for _, c := range doc.Checks {
+		if err := outcomeAgreement(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Ordering: checks by (host, kind, target), hosts by id.
 	for i := 1; i < len(doc.Checks); i++ {
 		prev, cur := doc.Checks[i-1], doc.Checks[i]

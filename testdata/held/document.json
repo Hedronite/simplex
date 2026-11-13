@@ -4,11 +4,11 @@
   "vantage": {"id": "lathe", "status": "ok"},
   "overall": "GREEN",
   "hosts": [
-    {"id": "tower", "severity": "GREEN", "reasons": ["held", "tcp_connect_refused"]}
+    {"id": "tower", "severity": "GREEN", "reasons": ["held", "tcp_connect_ok"]}
   ],
   "checks": [
-    {"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "down",
+    {"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
      "severity": "GREEN", "expected": "light",
-     "reasons": ["held", "tcp_connect_refused"]}
+     "reasons": ["held", "tcp_connect_ok"]}
   ]
 }
