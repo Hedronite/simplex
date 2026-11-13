@@ -189,8 +189,16 @@ func (r *Runner) Run(ctx context.Context, instances []Instance) []Observation {
 			out[i] = Observation{Host: inst.Host, Kind: inst.Kind, Target: inst.Target, Result: contract.ResultUnknown}
 			continue
 		}
+		// Take a permit only if the run is still live. A permit released by an
+		// in-flight probe after the deadline would otherwise let the loop start
+		// work whose budget is already spent.
+		select {
+		case sem <- struct{}{}:
+		case <-runCtx.Done():
+			out[i] = Observation{Host: inst.Host, Kind: inst.Kind, Target: inst.Target, Result: contract.ResultUnknown}
+			continue
+		}
 		wg.Add(1)
-		sem <- struct{}{}
 		go func(i int, inst Instance) {
 			defer wg.Done()
 			defer func() { <-sem }()
