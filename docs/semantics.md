@@ -42,6 +42,8 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 | `prom_up` | 200; 503 on `/-/ready`; 401 or 403; 200 on `/metrics` without `prometheus_build_info` in the first 64 KiB | connect refused; HTTP 404 or 5xx | timeout, unreachable, DNS error |
 | `ssh` (provisional) | banner starts with `SSH-` | connect refused; other banner | timeout, unreachable, DNS error |
 
+HTTP statuses: for `node_exporter` only 200 is up. For `prom_up`, the up statuses are the ones in the table; `prom_auth` and the readiness 503 (`prom_not_ready`) are `prom_up` codes and apply nowhere else. Any other HTTP status is `down` with `http_unexpected_status`. That includes 401 and 403 on `node_exporter`, 503 on `node_exporter` or on any `prom_up` path other than `/-/ready`, and 3xx on every kind, because redirects are not followed.
+
 Retry: one retry after 250 ms, on timeout only. Never retry a refusal.
 
 ## 4. Reason codes
