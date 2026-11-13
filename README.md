@@ -189,6 +189,20 @@ by field path only, and the last good snapshot stays; serve never exits on
 severity. SIGINT or SIGTERM finishes the pass in flight and exits 0.
 
 Exit codes: 0 normal stop, 3 config or usage error at startup, 4 the address
+cannot be bound or the server fails.
+
+Usage:
+  simplex serve [flags]
+
+Flags:
+      --config string               config file (default "simplex.yaml")
+      --deadline duration           time one pass may take (at most --interval) (default 15s)
+  -h, --help                        help for serve
+      --interval duration           time between probe passes (default 30s)
+      --listen string               address to serve /metrics on (loopback unless --unsafe-allow-non-loopback) (default "127.0.0.1:10081")
+      --out string                  write the document to this file every pass (temp file, fsync, atomic rename)
+      --overlay string              overlay file (default: $SIMPLEX_OVERLAY, then simplex.overlay.yaml when present)
+      --unsafe-allow-non-loopback   allow a non-loopback --listen; /metrics is unauthenticated
 ```
 
 The real exposition from `example.yaml`, run from a machine with no route to
