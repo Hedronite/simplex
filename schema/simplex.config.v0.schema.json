@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hedronite/simplex/schema/simplex.config.v0.schema.json",
+  "title": "simplex.config/v0",
+  "description": "Public probe config. Slugs only: addresses live in simplex.overlay/v0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "vantage", "hosts"],
+  "properties": {
+    "apiVersion": {
+      "const": "simplex.config/v0"
+    },
+    "vantage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+        },
+        "canaries": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Check references that must answer for the vantage to be trusted. Each names a configured ts_reach instance.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["host", "kind", "target"],
+            "properties": {
+              "host": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+              },
+              "kind": {
+                "enum": ["ts_reach"]
+              },
+              "target": {
+                "type": "string",
+                "pattern": "^:[0-9]{1,5}(/[!-~]*)?$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "hosts": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every host declares at least one check, so no run can produce a vacuous GREEN.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "checks"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "expected"],
+              "allOf": [
+                {
+                  "if": {
+                    "required": ["kind"],
+                    "properties": {"kind": {"const": "prom_up"}}
+                  },
+                  "else": {"not": {"required": ["path"]}}
+                }
+              ],
+              "properties": {
+                "kind": {
+                  "enum": ["ts_reach", "lan_reach", "node_exporter", "prom_up", "kube_apiserver", "ssh"]
+                },
+                "expected": {
+                  "enum": ["light", "dark"]
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "not": {"const": 18080},
+                  "description": "Set only for a check that needs a different port from the kind default."
+                },
+                "path": {
+                  "enum": ["/metrics", "/-/ready", "/-/healthy"],
+                  "description": "Legal only when kind is prom_up; any other kind naming a path is a config error."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "holds": {
+      "type": "array",
+      "description": "Announced, temporary darks. Expired holds are ignored and validate warns.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["host", "kind", "reason", "until"],
+        "properties": {
+          "host": {
+            "anyOf": [
+              {"const": "*"},
+              {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$"}
+            ]
+          },
+          "kind": {
+            "enum": ["*", "ts_reach", "lan_reach", "node_exporter", "prom_up", "kube_apiserver", "ssh"]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "until": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+          }
+        }
+      }
+    }
+  }
+}

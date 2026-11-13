@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hedronite/simplex/schema/simplex.probe.v0.schema.json",
+  "title": "simplex.probe/v0",
+  "description": "One probe run from one vantage. Derived fields (hosts[].severity, overall) follow docs/semantics.md section 6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "generated_at", "vantage", "overall", "hosts", "checks"],
+  "properties": {
+    "apiVersion": {
+      "const": "simplex.probe/v0"
+    },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "UTC, second precision, trailing Z."
+    },
+    "vantage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+        },
+        "status": {
+          "enum": ["ok", "blind", "unchecked"]
+        }
+      }
+    },
+    "overall": {
+      "enum": ["GREEN", "YELLOW", "RED"]
+    },
+    "hosts": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per host that has at least one check. Sorted by id. Never empty: overall must rest on an observation.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "reasons"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "severity": {
+            "enum": ["GREEN", "YELLOW", "RED"]
+          },
+          "reasons": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Union of the reasons of the host's worst-severity checks, in (kind, target) order.",
+            "items": {
+              "enum": [
+                "tcp_connect_ok",
+                "tcp_connect_refused",
+                "tcp_connect_timeout",
+                "http_timeout",
+                "http_unexpected_status",
+                "prom_not_ready",
+                "prom_auth",
+                "metrics_body_unexpected",
+                "expected_dark",
+                "unexpected_light",
+                "unexpected_dark",
+                "held",
+                "probe_unknown",
+                "prom_pair_down",
+                "prom_pair_degraded",
+                "vantage_blind"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per probed check instance, sorted by (host, kind, target).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["host", "kind", "target", "result", "severity", "expected", "reasons"],
+        "properties": {
+          "host": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "kind": {
+            "enum": ["ts_reach", "lan_reach", "node_exporter", "prom_up", "kube_apiserver", "ssh"]
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^:[0-9]{1,5}(/[!-~]*)?$",
+            "description": "Opaque instance string: port, plus the path for HTTP kinds. Never an address."
+          },
+          "result": {
+            "enum": ["up", "down", "unknown"]
+          },
+          "severity": {
+            "enum": ["GREEN", "YELLOW", "RED"]
+          },
+          "expected": {
+            "enum": ["light", "dark"]
+          },
+          "reasons": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Bytewise sorted. One outcome code at most, plus verdict codes. Empty when the check is healthy with nothing to report.",
+            "items": {
+              "enum": [
+                "tcp_connect_ok",
+                "tcp_connect_refused",
+                "tcp_connect_timeout",
+                "http_timeout",
+                "http_unexpected_status",
+                "prom_not_ready",
+                "prom_auth",
+                "metrics_body_unexpected",
+                "expected_dark",
+                "unexpected_light",
+                "unexpected_dark",
+                "held",
+                "probe_unknown",
+                "prom_pair_down",
+                "prom_pair_degraded",
+                "vantage_blind"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
