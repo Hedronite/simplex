@@ -1,0 +1,23 @@
+# Pins move by reviewed pull requests, never silently. Actions are pinned to
+# commit SHAs (scripts/check-tree.sh fails on anything else) and Dependabot
+# updates the SHA and its version comment together. Go modules follow the same
+# cadence. Dependabot commits carry no Signed-off-by, so a maintainer rebuilds
+# each one as a signed commit before it merges.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      go-modules:
+        patterns: ["*"]
