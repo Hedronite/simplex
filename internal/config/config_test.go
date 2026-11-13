@@ -347,6 +347,42 @@ func TestLoadHolds(t *testing.T) {
 	})
 }
 
+func TestHoldExpiryBoundary(t *testing.T) {
+	// The hold is live only while until is strictly after the run clock:
+	// until == now is expired, until == now+1s is live.
+	at := time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return at }
+	base := goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"
+
+	t.Run("until equal to the run clock is expired", func(t *testing.T) {
+		cfg, findings, err := Parse([]byte(base+"holds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: \"2026-11-13T18:00:00Z\"}\n"), clock)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if !hasFinding(findings, LevelWarning, "holds[0].until") {
+			t.Fatalf("want an expiry warning, got %+v", findings)
+		}
+		if len(cfg.Holds) != 1 || !cfg.Holds[0].Expired {
+			t.Fatalf("want the hold marked expired, got %+v", cfg.Holds)
+		}
+		if len(cfg.ActiveHolds()) != 0 {
+			t.Fatalf("want no active holds, got %+v", cfg.ActiveHolds())
+		}
+	})
+	t.Run("until one second after the run clock is live", func(t *testing.T) {
+		cfg, findings, err := Parse([]byte(base+"holds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: \"2026-11-13T18:00:01Z\"}\n"), clock)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if len(findings) != 0 {
+			t.Fatalf("want no findings, got %+v", findings)
+		}
+		if len(cfg.ActiveHolds()) != 1 {
+			t.Fatalf("want one active hold, got %+v", cfg.ActiveHolds())
+		}
+	})
+}
+
 func TestLoadDefaultsAndTargets(t *testing.T) {
 	cfg, _, _ := runLoad(t, loadCase{
 		name: "defaults and effective targets",

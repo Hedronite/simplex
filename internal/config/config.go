@@ -109,8 +109,9 @@ type Check struct {
 }
 
 // Hold is one announced, temporary dark. Host and Kind may be
-// contract.Wildcard. Expired is true when the hold's Until is in the past
-// against the run's clock; expired holds are ignored downstream.
+// contract.Wildcard. Expired is true when the hold's Until is at or
+// before the run's clock (a hold is live only while Until is strictly
+// after it); expired holds are ignored downstream.
 type Hold struct {
 	Host    string
 	Kind    contract.Kind
@@ -740,7 +741,9 @@ func parseHolds(n *yaml.Node, line int, now func() time.Time, errAt, warnAt errF
 				errAt(path+"."+f, item.Line, "required")
 			}
 		}
-		if !h.Until.IsZero() && h.Until.Before(now()) {
+		// A hold is live only while until is strictly after the run
+		// clock (docs/semantics.md section 5): until == now is expired.
+		if !h.Until.IsZero() && !h.Until.After(now()) {
 			h.Expired = true
 			warnAt(path+".until", item.Line, "hold expired at %s; ignored", h.Until.Format(time.RFC3339))
 		}
