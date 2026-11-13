@@ -154,7 +154,7 @@ func TestParseBack(t *testing.T) {
 				"simplex_host_severity":              {"GAUGE", len(doc.Hosts)},
 				"simplex_check_severity":             {"GAUGE", len(doc.Checks)},
 				"simplex_check_result":               {"GAUGE", len(doc.Checks) * len(contract.Results)},
-				"simplex_check_reason":               {"GAUGE", totalReasons(doc)},
+				"simplex_check_reason":               {"GAUGE", len(doc.Checks) * len(contract.ReasonCodes())},
 				"simplex_last_run_timestamp_seconds": {"GAUGE", 1},
 				"simplex_document_age_seconds":       {"GAUGE", 1},
 				"simplex_run_duration_seconds":       {"GAUGE", 1},
@@ -187,7 +187,78 @@ func TestParseBack(t *testing.T) {
 			// One-hot invariants: exactly one of each enum group carries 1.
 			assertOneHot(t, families, "simplex_vantage_status", "status", len(contract.VantageStatuses), 1)
 			assertOneHot(t, families, "simplex_check_result", "result", len(contract.Results), len(doc.Checks))
+			assertReasonBlock(t, families, doc)
 		})
+	}
+}
+
+// assertReasonBlock checks the reason family the same way a one-hot is checked:
+// every check has one series per frozen code, each 0 or 1, and the number of 1s
+// equals the number of known codes the check actually carries.
+func assertReasonBlock(t *testing.T, families map[string]*dto.MetricFamily, doc *document.Document) {
+	t.Helper()
+	mf, ok := families["simplex_check_reason"]
+	if !ok {
+		t.Fatal("family simplex_check_reason missing")
+	}
+	width := len(contract.ReasonCodes())
+	if len(mf.GetMetric()) != width*len(doc.Checks) {
+		t.Fatalf("%d reason samples, want %d checks x %d codes", len(mf.GetMetric()), len(doc.Checks), width)
+	}
+	// group key: host, kind, target
+	groups := map[string]map[string]float64{}
+	for _, m := range mf.GetMetric() {
+		var key strings.Builder
+		reason := ""
+		for _, lp := range m.GetLabel() {
+			switch lp.GetName() {
+			case "reason":
+				reason = lp.GetValue()
+			default:
+				key.WriteString(lp.GetName())
+				key.WriteByte('=')
+				key.WriteString(lp.GetValue())
+				key.WriteByte('\x00')
+			}
+		}
+		g, ok := groups[key.String()]
+		if !ok {
+			g = map[string]float64{}
+			groups[key.String()] = g
+		}
+		g[reason] = m.GetGauge().GetValue()
+	}
+	if len(groups) != len(doc.Checks) {
+		t.Fatalf("%d reason groups, want %d checks", len(groups), len(doc.Checks))
+	}
+	for _, c := range doc.Checks {
+		key := "host=" + c.Host + "\x00kind=" + string(c.Kind) + "\x00target=" + c.Target + "\x00"
+		g, ok := groups[key]
+		if !ok {
+			t.Fatalf("no reason block for %s/%s %s", c.Host, c.Kind, c.Target)
+		}
+		if len(g) != width {
+			t.Fatalf("%s/%s: %d codes, want %d", c.Host, c.Kind, len(g), width)
+		}
+		ones := 0
+		for code, v := range g {
+			switch v {
+			case 0:
+			case 1:
+				ones++
+			default:
+				t.Fatalf("%s/%s: %s is %v, want 0 or 1", c.Host, c.Kind, code, v)
+			}
+		}
+		want := 0
+		for _, r := range c.Reasons {
+			if contains(contract.ReasonCodes(), r) {
+				want++
+			}
+		}
+		if ones != want {
+			t.Fatalf("%s/%s: %d codes read 1, the check carries %d known codes", c.Host, c.Kind, ones, want)
+		}
 	}
 }
 
@@ -251,21 +322,6 @@ func assertOneHot(t *testing.T, families map[string]*dto.MetricFamily, family, l
 			t.Fatalf("%s: group %q has %d ones, want exactly 1", family, key, ones)
 		}
 	}
-}
-
-func totalReasons(doc *document.Document) int {
-	n := 0
-	for _, c := range doc.Checks {
-		for _, r := range c.Reasons {
-			for _, known := range contract.ReasonCodes() {
-				if r == known {
-					n++
-					break
-				}
-			}
-		}
-	}
-	return n
 }
 
 // TestBeforeFirstRun pins the cold-start surface: build info and the error
@@ -370,24 +426,36 @@ func contains[T comparable](set []T, v T) bool {
 	return false
 }
 
-// TestSentinelNeverEchoed puts an address-shaped sentinel into fields the
-// encoder receives but must not export, and proves it stays out of the output.
+// TestSentinelNeverEchoed does two jobs. It puts an address-shaped sentinel
+// into fields the encoder receives but must not export, and it pins the reason
+// block from both ends: a code the contract does not know produces no sample
+// and no label, while a known code reads 1 with the other fifteen reading 0.
 func TestSentinelNeverEchoed(t *testing.T) {
 	const sentinel = "sentinel.example.invalid:9999"
+	const sentinelReason = "sentinel_reason_code"
 	doc := &document.Document{
 		APIVersion:  contract.ProbeAPIVersion,
 		GeneratedAt: goldenNow.Add(-time.Minute).Format(time.RFC3339),
 		Vantage:     document.Vantage{ID: sentinel, Status: contract.VantageOK},
 		Overall:     contract.SeverityYellow,
 		Hosts:       []document.Host{{ID: "box", Severity: contract.SeverityYellow}},
-		Checks: []document.Check{{
-			Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready",
-			Result: contract.ResultDown, Severity: contract.SeverityYellow,
-			Expected: contract.ExpectedLight,
-			// A code the contract does not know: the encoder emits reasons from
-			// the frozen enum, so this must not become a label value.
-			Reasons: []contract.Reason{"sentinel_reason_code"},
-		}},
+		Checks: []document.Check{
+			{
+				Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready",
+				Result: contract.ResultDown, Severity: contract.SeverityYellow,
+				Expected: contract.ExpectedLight,
+				// A code the contract does not know: the encoder emits reasons
+				// from the frozen enum, so this must not become a label value.
+				Reasons: []contract.Reason{sentinelReason},
+			},
+			{
+				Host: "box", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+				Result: contract.ResultDown, Severity: contract.SeverityYellow,
+				Expected: contract.ExpectedLight,
+				// A known code, which must read 1 while the rest read 0.
+				Reasons: []contract.Reason{contract.ReasonUnexpectedDark},
+			},
+		},
 	}
 	got, err := String(&Snapshot{Doc: doc, Version: "v", Commit: "c"}, goldenNow)
 	if err != nil {
@@ -396,54 +464,95 @@ func TestSentinelNeverEchoed(t *testing.T) {
 	if strings.Contains(got, sentinel) {
 		t.Fatalf("the vantage id leaked into the exposition:\n%s", got)
 	}
-	if strings.Contains(got, "sentinel_reason_code") {
+	if strings.Contains(got, sentinelReason) {
 		t.Fatalf("an unknown reason code became a label value:\n%s", got)
 	}
-	if strings.Contains(got, "simplex_check_reason{") {
-		t.Fatalf("a check with no frozen reason still produced a reason series:\n%s", got)
+
+	// One block per check, one series per frozen code, and only the known code
+	// set on the second check.
+	blocks := map[string]map[string]string{}
+	for _, line := range strings.Split(got, "\n") {
+		if !strings.HasPrefix(line, "simplex_check_reason{") {
+			continue
+		}
+		open := strings.Index(line, `}`)
+		if open < 0 {
+			t.Fatalf("malformed reason line %q", line)
+		}
+		lbls, value := line[:open+1], strings.TrimSpace(line[open+1:])
+		reasonAt := strings.Index(lbls, `reason="`)
+		if reasonAt < 0 {
+			t.Fatalf("reason line without a reason label: %q", line)
+		}
+		reason := strings.TrimSuffix(lbls[reasonAt+len(`reason="`):], `"}`)
+		block := lbls[:reasonAt]
+		if blocks[block] == nil {
+			blocks[block] = map[string]string{}
+		}
+		blocks[block][reason] = value
+	}
+	if len(blocks) != 2 {
+		t.Fatalf("%d reason blocks, want one per check", len(blocks))
+	}
+	ones := 0
+	for block, codes := range blocks {
+		if len(codes) != len(contract.ReasonCodes()) {
+			t.Fatalf("%s: %d codes, want %d", block, len(codes), len(contract.ReasonCodes()))
+		}
+		for code, value := range codes {
+			switch value {
+			case "0":
+			case "1":
+				ones++
+				if code != string(contract.ReasonUnexpectedDark) {
+					t.Fatalf("%s: %s reads 1 and should not", block, code)
+				}
+			default:
+				t.Fatalf("%s: %s is %q, want 0 or 1", block, code, value)
+			}
+		}
+	}
+	if ones != 1 {
+		t.Fatalf("%d codes read 1, want exactly the one known code carried", ones)
 	}
 }
 
-// TestCardinalityBound pins the series count of the largest fixture and the
-// formula it comes from, so growth in labels shows up as a number.
-func TestCardinalityBound(t *testing.T) {
-	var largest string
-	var largestCount int
-	for _, name := range fixtureCases(t) {
-		body, err := os.ReadFile(filepath.Join("testdata", name+".txt"))
-		if err != nil {
-			t.Fatalf("read golden: %v", err)
-		}
-		count := 0
-		for _, line := range strings.Split(string(body), "\n") {
-			if line != "" && !strings.HasPrefix(line, "#") {
-				count++
-			}
-		}
-		if count > largestCount {
-			largest, largestCount = name, count
-		}
-	}
-	if largest == "" {
-		t.Fatal("no goldens to measure")
-	}
-
-	doc := loadDocument(t, filepath.Join("..", "..", "testdata", largest, "document.json"))
-	// One build info, one overall, three vantage statuses, one host severity
-	// per host, one check severity and three results per check, one reason per
-	// reason code present, three run-level series and one error counter.
-	want := 1 + 1 + len(contract.VantageStatuses) + len(doc.Hosts) +
-		len(doc.Checks)*(1+len(contract.Results)) + totalReasons(doc) + 3 + 1
-	if largestCount != want {
-		t.Fatalf("%s: %d samples, the formula gives %d", largest, largestCount, want)
-	}
-	// A per-check reason ceiling: no check may carry more series than the
-	// frozen enum allows.
+// TestSeriesFormula asserts the exact sample count for every fixture against
+// the documented formula, so a label or family change shows up as a number
+// rather than as a slightly larger ceiling.
+//
+//	1 build info
+//	1 overall
+//	3 vantage statuses
+//	1 host severity per host
+//	1 check severity + 3 results + 16 reasons per check
+//	1 last-run timestamp + 1 document age + 1 run duration + 1 error counter
+func TestSeriesFormula(t *testing.T) {
+	fixed := 1 + 1 + 3 + 3 + 1
 	perCheck := 1 + len(contract.Results) + len(contract.ReasonCodes())
-	if bound := 5 + len(doc.Hosts) + len(doc.Checks)*perCheck; largestCount > bound {
-		t.Fatalf("%s: %d samples exceeds the label-space bound %d", largest, largestCount, bound)
+	cases := fixtureCases(t)
+	if len(cases) == 0 {
+		t.Fatal("no fixture documents")
 	}
-	t.Logf("largest fixture %s: %d samples, per-check ceiling %d", largest, largestCount, perCheck)
+	for _, name := range cases {
+		t.Run(name, func(t *testing.T) {
+			body, err := os.ReadFile(filepath.Join("testdata", name+".txt"))
+			if err != nil {
+				t.Fatalf("read golden: %v", err)
+			}
+			samples := 0
+			for _, line := range strings.Split(string(body), "\n") {
+				if line != "" && !strings.HasPrefix(line, "#") {
+					samples++
+				}
+			}
+			doc := loadDocument(t, filepath.Join("..", "..", "testdata", name, "document.json"))
+			want := fixed + len(doc.Hosts) + len(doc.Checks)*perCheck
+			if samples != want {
+				t.Fatalf("%d samples, the formula gives %d", samples, want)
+			}
+		})
+	}
 }
 
 // TestNamingAndTypes pins the naming rules the lint cannot fully express:

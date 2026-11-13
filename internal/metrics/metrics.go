@@ -108,16 +108,19 @@ func (e *encoder) document(now time.Time) {
 		}
 	}
 
-	e.family("simplex_check_reason", "gauge", "Reason code carried by one check instance.")
+	e.family("simplex_check_reason", "gauge", "One series per frozen reason code, 1 when the check carries it.")
 	for _, c := range doc.Checks {
 		// Driven by the frozen enum, not by the document, so the label space
 		// cannot grow past the sixteen codes even if a document carried one
-		// the contract does not know.
+		// the contract does not know. Every code gets a series, so a check
+		// with no reason is a block of zeros rather than a gap: a query can
+		// tell "not carried" from "not exported".
 		for _, reason := range contract.ReasonCodes() {
-			if !hasReason(c.Reasons, reason) {
-				continue
+			v := 0.0
+			if hasReason(c.Reasons, reason) {
+				v = 1
 			}
-			e.sample("simplex_check_reason", append(checkLabels(&c), label{"reason", string(reason)}), 1)
+			e.sample("simplex_check_reason", append(checkLabels(&c), label{"reason", string(reason)}), v)
 		}
 	}
 
