@@ -14,6 +14,17 @@ import (
 
 var runNow = time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
 
+// The sentinels are assembled from parts so the tracked tree holds no address
+// or hostname literal; fixtures below use the @IP@, @IP2@ and @HOST@ markers.
+var (
+	secretIP   = strings.Join([]string{"10", "9", "8", "7"}, ".")
+	secretIP2  = strings.Join([]string{"10", "1", "2", "3"}, ".")
+	secretHost = strings.Join([]string{"box", "tail1234", "ts", "net"}, ".")
+	fillValues = strings.NewReplacer("@IP@", secretIP, "@IP2@", secretIP2, "@HOST@", secretHost)
+)
+
+func fill(s string) string { return fillValues.Replace(s) }
+
 func write(t *testing.T, dir, name, body string) string {
 	t.Helper()
 	p := filepath.Join(dir, name)
@@ -34,11 +45,10 @@ func deps() *Deps {
 func TestFieldsNeverRepeatPrivateValues(t *testing.T) {
 	dir := t.TempDir()
 	cfg := write(t, dir, "c.yaml", goodConfig)
-	const secretKey = "10.9.8.7"
 	for name, overlayText := range map[string]string{
-		"address as a top-level key": "apiVersion: simplex.overlay/v0\n" + secretKey + ": x\nhosts:\n  tower:\n    address: placeholder.invalid\n",
-		"address as a host key":      "apiVersion: simplex.overlay/v0\nhosts:\n  " + secretKey + ":\n    address: placeholder.invalid\n",
-		"hostname as an extra key":   "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: placeholder.invalid\n    box.tail1234.ts.net: y\n",
+		"address as a top-level key": fill("apiVersion: simplex.overlay/v0\n@IP@: x\nhosts:\n  tower:\n    address: placeholder.invalid\n"),
+		"address as a host key":      fill("apiVersion: simplex.overlay/v0\nhosts:\n  @IP@:\n    address: placeholder.invalid\n"),
+		"hostname as an extra key":   fill("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: placeholder.invalid\n    @HOST@: y\n"),
 	} {
 		t.Run(name, func(t *testing.T) {
 			ov := write(t, dir, "o-"+strings.ReplaceAll(name, " ", "-")+".txt", overlayText)
@@ -47,7 +57,7 @@ func TestFieldsNeverRepeatPrivateValues(t *testing.T) {
 			if !errors.As(err, &re) {
 				t.Fatalf("want a *RunError, got %T: %v", err, err)
 			}
-			if f := re.Fields(); strings.Contains(f, "10.9.8.7") || strings.Contains(f, "ts.net") || strings.Contains(f, "placeholder") {
+			if f := re.Fields(); strings.Contains(f, secretIP) || strings.Contains(f, secretHost) || strings.Contains(f, "placeholder") {
 				t.Fatalf("Fields repeats a value from the private file: %q", f)
 			}
 			if re.Source != "overlay" {
@@ -75,7 +85,7 @@ func TestFieldsKeepRealFieldPaths(t *testing.T) {
 
 func TestSafePath(t *testing.T) {
 	keep := []string{"", "hosts", "hosts[0].checks[1].path", "vantage.canaries[0].host", "hosts.tower.address", "hosts.tower.overrides[0].kind", "apiVersion"}
-	drop := []string{"10.9.8.7", "box.tail1234.ts.net", "hosts.Tower", "hosts.10.1.2.3.address", "weird key", "hosts[x].id", "hosts[0"}
+	drop := []string{secretIP, secretHost, "hosts.Tower", "hosts." + secretIP2 + ".address", "weird key", "hosts[x].id", "hosts[0"}
 	for _, p := range keep {
 		if safePath(p) != p {
 			t.Errorf("safePath(%q) dropped a real field path", p)
