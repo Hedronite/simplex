@@ -138,17 +138,27 @@ datasources:
     url: http://127.0.0.1:$PROM_PORT
     isDefault: true
 YAML
-# The provider file the repo ships points at /var/lib/grafana/dashboards, and the
-# checked-in dashboard is mounted exactly there, so the real path is under test
-# rather than a rewritten one.
+# The provider file the repo ships scans $DASH_DIR, and the checked-in dashboard
+# is mounted exactly there, so the path under test is the provider's own rather
+# than a path this script invented.
 docker_run simplex-grafana \
 	--network host \
 	-e GF_SECURITY_ADMIN_PASSWORD=throwaway-ci-only \
 	-e GF_AUTH_ANONYMOUS_ENABLED=false \
+	-e GF_PLUGINS_PREINSTALL_DISABLED=true \
+	-e GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false \
 	-v "$WORK/provisioning:/etc/grafana/provisioning:ro" \
 	-v "$WORK/rootfs$DASH_DIR:$DASH_DIR:ro" \
 	"$GRAFANA_IMAGE"
 wait_http "http://127.0.0.1:$GRAFANA_PORT/api/health" 90
+
+# A pinned image that rewrites its own plugins at startup is not pinned. This
+# fails the job rather than letting a differential version ride along.
+if docker logs simplex-grafana 2>&1 |
+	grep -Eqi 'installing plugin|downloading plugin|plugin .*(was |is )?updated|auto-?updat'; then
+	docker logs simplex-grafana 2>&1 | grep -Ei 'installing plugin|downloading plugin|plugin .*(was |is )?updated|auto-?updat' | head -10 >&2
+	fail "Grafana installed or updated a plugin at startup; the image is not deterministic"
+fi
 
 note "the dashboard is served under its frozen uid, from the provider path $DASH_DIR"
 curl -fsS -u "admin:throwaway-ci-only" \
