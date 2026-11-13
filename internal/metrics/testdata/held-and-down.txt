@@ -38,6 +38,11 @@ simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reas
 simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="prom_pair_down"} 0
 simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="prom_pair_degraded"} 0
 simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="vantage_blind"} 0
+simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="ts_peer_online"} 0
+simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="ts_peer_offline"} 0
+simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="ts_peer_unmatched"} 0
+simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="ts_path_direct"} 0
+simplex_check_reason{host="box",kind="node_exporter",target=":9100/metrics",reason="ts_path_relayed"} 0
 # HELP simplex_last_run_timestamp_seconds End of the last completed run, in Unix seconds.
 # TYPE simplex_last_run_timestamp_seconds gauge
 simplex_last_run_timestamp_seconds 1794592802

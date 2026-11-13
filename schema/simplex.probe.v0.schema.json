@@ -69,7 +69,12 @@
                 "probe_unknown",
                 "prom_pair_down",
                 "prom_pair_degraded",
-                "vantage_blind"
+                "vantage_blind",
+                "ts_peer_online",
+                "ts_peer_offline",
+                "ts_peer_unmatched",
+                "ts_path_direct",
+                "ts_path_relayed"
               ]
             }
           }
@@ -127,7 +132,12 @@
                 "probe_unknown",
                 "prom_pair_down",
                 "prom_pair_degraded",
-                "vantage_blind"
+                "vantage_blind",
+                "ts_peer_online",
+                "ts_peer_offline",
+                "ts_peer_unmatched",
+                "ts_path_direct",
+                "ts_path_relayed"
               ]
             }
           }
