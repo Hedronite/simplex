@@ -1,0 +1,42 @@
+# HELP simplex_build_info Build information for this binary.
+# TYPE simplex_build_info gauge
+simplex_build_info{version="0.0.0-dev",commit="unknown"} 1
+# HELP simplex_overall_severity Worst severity of the last completed run: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_overall_severity gauge
+simplex_overall_severity 1
+# HELP simplex_vantage_status One-hot vantage status of the last completed run.
+# TYPE simplex_vantage_status gauge
+simplex_vantage_status{status="ok"} 0
+simplex_vantage_status{status="blind"} 0
+simplex_vantage_status{status="unchecked"} 1
+# HELP simplex_host_severity Severity of one host: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_host_severity gauge
+simplex_host_severity{host="box"} 1
+simplex_host_severity{host="lathe"} 0
+# HELP simplex_check_severity Severity of one check instance: 0 GREEN, 1 YELLOW, 2 RED.
+# TYPE simplex_check_severity gauge
+simplex_check_severity{host="box",kind="prom_up",target=":9090/-/ready"} 1
+simplex_check_severity{host="lathe",kind="prom_up",target=":9090/-/ready"} 0
+# HELP simplex_check_result One-hot probe result of one check instance.
+# TYPE simplex_check_result gauge
+simplex_check_result{host="box",kind="prom_up",target=":9090/-/ready",result="up"} 1
+simplex_check_result{host="box",kind="prom_up",target=":9090/-/ready",result="down"} 0
+simplex_check_result{host="box",kind="prom_up",target=":9090/-/ready",result="unknown"} 0
+simplex_check_result{host="lathe",kind="prom_up",target=":9090/-/ready",result="up"} 1
+simplex_check_result{host="lathe",kind="prom_up",target=":9090/-/ready",result="down"} 0
+simplex_check_result{host="lathe",kind="prom_up",target=":9090/-/ready",result="unknown"} 0
+# HELP simplex_check_reason Reason code carried by one check instance.
+# TYPE simplex_check_reason gauge
+simplex_check_reason{host="box",kind="prom_up",target=":9090/-/ready",reason="prom_not_ready"} 1
+# HELP simplex_last_run_timestamp_seconds End of the last completed run, in Unix seconds.
+# TYPE simplex_last_run_timestamp_seconds gauge
+simplex_last_run_timestamp_seconds 1794592802
+# HELP simplex_document_age_seconds Age of the served document, computed at scrape.
+# TYPE simplex_document_age_seconds gauge
+simplex_document_age_seconds 12
+# HELP simplex_run_duration_seconds Duration of the last completed run, in seconds.
+# TYPE simplex_run_duration_seconds gauge
+simplex_run_duration_seconds 1.5
+# HELP simplex_run_errors_total Runs that produced no document.
+# TYPE simplex_run_errors_total counter
+simplex_run_errors_total 3
