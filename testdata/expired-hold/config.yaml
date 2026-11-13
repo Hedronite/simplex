@@ -1,0 +1,12 @@
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}
+holds:
+  - host: tower
+    kind: ts_reach
+    reason: planned maintenance
+    until: "2026-11-13T00:00:00Z"
