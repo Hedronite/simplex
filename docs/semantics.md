@@ -23,7 +23,7 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 | `lan_reach` (provisional) | TCP connect over the LAN address | 22 | `:22` | light |
 | `ssh` (provisional) | TCP connect plus `SSH-` banner on a named path | 22 | `:22` | light |
 
-- `target` is `:<port>` plus the path for HTTP kinds. It never contains an address.
+- `target` is `:<port>` plus the path for HTTP kinds. It never contains an address. The document always carries the resolved `target`; config may omit it and accept the kind default.
 - Port 18080 is never dialed. Config load rejects any check that names it, and the dialer refuses it as well.
 - `prom_up` path comes from an allowlist: `/metrics`, `/-/ready`, `/-/healthy`. Default `/-/ready`. HTTP only, host must be an overlay slug, no userinfo, no query, no redirects, 1 MiB body cap.
 - `lan_reach` and `ssh` land in the third S1 slice. Their rows are intent, not freeze. The kind names are frozen.
@@ -42,11 +42,18 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 
 Retry: one retry after 250 ms, on timeout only. Never retry a refusal.
 
+Classification and severity are separate layers, in this order and no other:
+
+1. **Outcome layer.** Every probed check carries exactly one outcome code, chosen by the table above. Outcome codes describe; they never carry severity. They never replace or suppress a verdict code.
+2. **Verdict layer.** §5 decides severity and, per check, at most one verdict code. A check may be YELLOW with zero verdict codes (`prom_not_ready`, `prom_auth`, `metrics_body_unexpected` are enough on their own).
+3. **Pair layer.** §5.5 may replace the verdict on `prom_up` checks and raise severity to RED.
+4. **Derivation.** §6 rolls checks up to hosts and hosts up to `overall`.
+
 ## 4. Reason codes
 
 Closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. `watchdog_only` and `peer_prometheus_*` are not Simplex codes.
 
-Each probed check carries exactly one **outcome** code, plus zero or more **verdict** codes. Under a blind vantage a check carries only `vantage_blind`. `reasons[]` is sorted bytewise ascending.
+Each probed check carries exactly one **outcome** code, plus zero or one **verdict** code. The only check with no outcome code is one invalidated by a blind vantage, which carries `vantage_blind` alone. `reasons[]` is sorted bytewise ascending.
 
 | Code | Class | Emitted when |
 | --- | --- | --- |
@@ -66,39 +73,85 @@ Each probed check carries exactly one **outcome** code, plus zero or more **verd
 | `unexpected_dark` | verdict | check is expected light and is down |
 | `held` | verdict | an unexpired hold matches |
 | `probe_unknown` | verdict | check is expected light and result is `unknown` |
-| `prom_pair_down` | verdict | every non-held `prom_up` check is not up (two or more) |
-| `prom_pair_degraded` | verdict | some, not all, non-held `prom_up` checks are not up |
+| `prom_pair_down` | verdict | every non-held, expected-light `prom_up` check is not up (two or more) |
+| `prom_pair_degraded` | verdict | some, not all, non-held, expected-light `prom_up` checks are not up |
 | `vantage_blind` | blind | the vantage cannot see the mesh |
 
 ## 5. Severity rules
 
-Evaluated per check, in this order. The first rule that matches decides.
+Two passes over the same document: per-check rules in a fixed order (first match decides), then the pair pass. Holds and blindness are decided in the per-check pass.
 
-1. **Blind vantage:** result `unknown`, severity YELLOW, reasons `[vantage_blind]`. This overrides holds and expected-dark.
-2. **Held** (an unexpired hold matches host and kind): severity GREEN, reasons gain `held`, whatever the result. The check still runs and reports its real result.
-3. **Expected dark:** not up gives GREEN `expected_dark`. Up gives YELLOW `unexpected_light`.
+1. **Blind vantage:** result `unknown`, reasons `[vantage_blind]`, severity RED. This overrides holds, expected-dark and the pair pass.
+2. **Held** (an unexpired hold matches host and kind): severity GREEN, reasons gain `held`, whatever the result. The check still runs and reports its real result and its outcome code.
+3. **Expected dark:** up gives YELLOW `unexpected_light`. Not up gives GREEN `expected_dark`.
 4. **Expected light:**
    - up: GREEN. The outcome codes `prom_not_ready`, `prom_auth` and `metrics_body_unexpected` raise it to YELLOW, with no verdict code.
    - down: YELLOW `unexpected_dark`.
    - unknown: YELLOW `probe_unknown`. Never RED on its own.
-5. **Prometheus pair:** over the non-held, expected-light `prom_up` checks. If there are two or more and none is up, each gets RED `prom_pair_down`. If at least one is not up and at least one is up, each not-up check gets YELLOW `prom_pair_degraded`. The pair verdict replaces `unexpected_dark` and `probe_unknown` on those checks. With a single such check, rule 4 applies.
+5. **Prometheus pair (second pass):** see §5.5.
 
 An unexpected `node_exporter` that is not up is YELLOW and never RED on its own.
 
-A held `prom_up` check is excluded from the pair count. It cannot raise a rollup, and the remaining member, if not up, is YELLOW `prom_pair_degraded` rather than RED. *Resolved at S0 for schema review: the spec says held checks never raise any rollup and does not cover this overlap.*
+### 5.5 Prometheus pair
+
+Let P be every `prom_up` check in the document that is `expected: light` and has no unexpired hold. Held `prom_up` checks and any `expected: dark` `prom_up` check are outside P.
+
+| P | Condition | Result |
+| --- | --- | --- |
+| 0 or 1 | any | The pair pass is silent. Rule 4 stands for the single member. |
+| 2 or more | every member is not `up` | Each member gets severity RED and verdict `prom_pair_down`, replacing `unexpected_dark` or `probe_unknown`. |
+| 2 or more | some members are not `up`, at least one is `up` | Each not-up member gets severity YELLOW and verdict `prom_pair_degraded`, replacing its own verdict. Up members are unchanged. |
+| 2 or more | no member is not `up` | The pair pass is silent. |
+
+- The pair verdict is written to the **checks**. `hosts[]` and `overall` follow by derivation (§6); RED is never assigned to a host directly.
+- A held `prom_up` check is outside P, so held + down yields `prom_pair_degraded` YELLOW on the survivor, never RED. This resolves the overlap between "a hold never raises a rollup" and the pair rule.
+- The pair pass never touches a check of another kind.
+
+### 5.6 Combination rows
+
+Pinned so the order cannot be guessed. `expected` from config, `result` and outcome from §3, then the first matching rule of §5.
+
+| Expected | Result | Outcome code | Verdict | Severity |
+| --- | --- | --- | --- | --- |
+| dark | up | `http_ok` | `unexpected_light` | YELLOW |
+| dark | up | `prom_not_ready` (503 on `/-/ready` counts as up) | `unexpected_light` | YELLOW |
+| dark | up | `prom_auth` | `unexpected_light` | YELLOW |
+| dark | not up | `http_timeout` | `expected_dark` | GREEN |
+| light | up | `tcp_connect_refused` (`ts_reach` refusal is up) | none | GREEN |
+| light | up | `metrics_body_unexpected` | none | YELLOW |
+| light | down | `http_unexpected_status` | `unexpected_dark` | YELLOW |
+| light | unknown | `tcp_connect_timeout` | `probe_unknown` | YELLOW |
+| any | any | any | `held` | GREEN |
+| any | unknown | none (`vantage_blind` alone) | `vantage_blind` | RED |
 
 ## 6. Derivation
 
+Derivation runs after §5, from the finished check list. It is mechanical and has no exceptions.
+
 - `hosts[].severity` is the worst severity among that host's checks.
-- `hosts[].reason` is the first reason of the host's worst-severity checks, taking the check order (kind, target) and, within a check, the verdict code if there is one, otherwise the outcome code. It is `""` when the host is GREEN.
-- `overall` is the worst host severity.
+- `hosts[].reason` is the code of the **first** check in that host's (kind, target) bytewise order among the checks whose severity equals `hosts[].severity`: the check's verdict code if it has one, otherwise its outcome code. It is `""` when the host is GREEN.
+- A host with no checks has no `hosts[]` entry. No observation, no verdict.
+- `overall` is the worst `hosts[].severity`, and `overall` is GREEN when `hosts[]` is empty.
 - Held and expected-dark checks are GREEN, so they never raise any rollup.
-- **Blind exception:** under a blind vantage every check and host is YELLOW and `overall` is RED. This is the one case where `overall` is not the worst host. A test pins it.
+- **Blind:** §5.1 makes every check RED, so every host is RED by the ordinary rule and `overall` is RED by the ordinary rule. There is no rollup exception to explain: blindness is a judgment on every check, not a shortcut on `overall`. Exit `5` is the signal that distinguishes blind from a mesh that is genuinely broken. A test pins a blind fixture to `overall: RED`, exit `5`, and every check and host RED with reason `vantage_blind`.
 - Check order, host order: bytewise ascending by (host, kind, target). No map iteration reaches the JSON.
 
 ## 7. Vantage
 
-`vantage.status` is one of:
+Config:
+
+```yaml
+apiVersion: simplex.config/v0
+vantage:
+  id: lathe                # required, host slug shape
+  canaries: [tower]        # optional, host slugs
+```
+
+- `vantage.id` is required. It is copied to `vantage.id` in the document.
+- `vantage.canaries` is an optional list of host slugs, unique, ascending. Each slug must name a host in `hosts[]` that has exactly one `ts_reach` check instance. `validate` errors otherwise, because a canary that cannot be dialed would report `unchecked` forever.
+- A canary is dialed as that host's `ts_reach` instance. There is no separate canary check kind.
+
+`vantage.status` in the document is one of:
 
 - `ok`: the local tailnet address is present and at least one configured canary succeeded.
 - `unchecked`: the local tailnet address is present and no canary is configured.
@@ -108,7 +161,9 @@ The local test looks for an address in the CGNAT range (RFC 6598) on an interfac
 
 ## 8. Files
 
-Config (`simplex.config/v0`), public, slugs only. Strict decoding: unknown keys and unknown major versions are errors.
+### 8.1 Config (`simplex.config/v0`)
+
+Public, slugs only, strict decoding: unknown keys and unknown major versions are errors. Required: `apiVersion`, `vantage`, `hosts`.
 
 ```yaml
 apiVersion: simplex.config/v0
@@ -118,7 +173,7 @@ vantage:
 hosts:
   - id: tower
     checks:
-      - kind: ts_reach       # port optional, default per kind
+      - kind: ts_reach       # target optional, default per kind
       - kind: node_exporter
       - kind: kube_apiserver # expected defaults to dark for this kind
   - id: box
@@ -132,7 +187,21 @@ holds:
     until: 2026-11-20T00:00:00Z  # RFC 3339, required
 ```
 
-Overlay (`simplex.overlay/v0`), private, never tracked (`simplex.overlay.yaml`, `*.overlay.yaml`). Path from `--overlay` or `SIMPLEX_OVERLAY`, never an argv value that carries an address.
+| Field | Required | Rule |
+| --- | --- | --- |
+| `apiVersion` | yes | `const simplex.config/v0` |
+| `vantage.id` | yes | slug |
+| `vantage.canaries` | no | unique host slugs, each with one `ts_reach` check |
+| `hosts[]` | yes, 1 or more | each `id` unique |
+| `hosts[].checks[]` | yes, 1 or more | `kind` required; `target`, `path`, `expected`, `timeout` optional |
+| `hosts[].checks[].expected` | no | defaults per §2; the document always carries it |
+| `holds[]` | no | `host`, `kind`, `reason`, `until` all required |
+
+`example.yaml` in the repo root is a config document with public slugs only. It validates against the config schema in CI.
+
+### 8.2 Overlay (`simplex.overlay/v0`)
+
+Private, never tracked (`simplex.overlay.yaml`, `*.overlay.yaml`). Path from `--overlay` or `SIMPLEX_OVERLAY`, never an argv value that carries an address.
 
 ```yaml
 apiVersion: simplex.overlay/v0
@@ -140,7 +209,10 @@ hosts:
   tower: {address: "<tailnet address or name>", lan_address: "<optional>"}
 ```
 
-A check that needs an address with no overlay entry fails closed: exit `3`, naming the missing slugs. Expired holds are ignored and `validate` warns.
+- The map is keyed by host slug, and the slug must exist in the config.
+- `address` is required; `lan_address` is optional and only used by `lan_reach`.
+- No other keys. Ports, paths, kinds and targets are public config, never overlay.
+- A check that needs an address with no overlay entry fails closed: exit `3`, naming the missing slugs. Expired holds are ignored and `validate` warns.
 
 ## 9. Document
 
@@ -164,7 +236,11 @@ A check that needs an address with no overlay entry fails closed: exit `3`, nami
 }
 ```
 
-`generated_at` is UTC, second precision, ending in `Z`. `--now` pins it and the hold clock together. Additive changes within `v0`; consumers refuse unknown majors via `apiVersion`.
+- `apiVersion` is required and is `const simplex.probe/v0`. Consumers refuse unknown majors.
+- `vantage.id` is required; `vantage.status` is the enum from §7.
+- `hosts[].reason` is a reason code or the empty string (§6). `checks[].reasons[]` is never empty.
+- `generated_at` is UTC, second precision, ending in `Z`. `--now` pins it and the hold clock together.
+- Additive changes within `v0`. A new field, check kind or reason code is minor; removing, renaming or retyping one is breaking.
 
 ## 10. Exit codes
 
@@ -179,6 +255,8 @@ A check that needs an address with no overlay entry fails closed: exit `3`, nami
 
 No error path exits 0, 1 or 2. Under `--json`, every non-zero error exit (3, 4) writes one `{"error":{"code","message"}}` line to stderr. `serve` never exits on severity: `0` normally, `3` or `4` for config, bind or I/O. Only `main` maps errors to codes.
 
+`validate` under `--json` writes its findings to stdout as `{"warnings":["<path>: <message>"],"errors":["<path>: <message>"]}`, exits `0` with warnings only and `3` with errors; diagnostics prose stays on stderr.
+
 ## 11. Document file
 
 Consumers such as Vigil read the document from a file and never run `simplex`.
@@ -189,16 +267,43 @@ Consumers such as Vigil read the document from a file and never run `simplex`.
 - **Writer of record is `serve --out`.** It uses the same snapshot as `/metrics` and writes every interval. A timer running `check --json --out` is the supported fallback.
 - A failed write (unwritable directory, failed rename) is an I/O error, exit `4`, and removes its temp file.
 
-### Fixture and test notes
+### Fixture layout
 
-- Every fixture directory under `testdata/` holds `probe.json` (when the exit code writes a document) and `expect.json`: `{"exit_code": N, "writes_document": true|false}`. `writes_document` must equal `exitcode.WritesDocument(exit_code)`.
-- Add two error fixtures with no `probe.json`: a config error (exit 3) and an I/O error (exit 4).
-- S1 tests for `--out`: the temp file lives in the target directory; the target is replaced by rename, never truncated in place; a prior good file is byte-identical after an exit 3 or 4 run; exit 5 writes a document with `vantage.status: blind`; the file mode is `0644`; no temp file remains after success or failure; `serve --out` writes the same bytes the `/metrics` snapshot was built from.
+Frozen at S0 so CI conformance and QA automation key off one shape.
 
-## 12. CLI contract
+- `testdata/<case>/exit`: the single integer exit code the case must produce, one line.
+- `testdata/<case>/probe.json`: the golden document, present exactly when `exitcode.WritesDocument(code)` is true. No other file names are read.
+- `testdata/<case>/config.yaml` and `testdata/<case>/overlay.yaml` when the case needs inputs. Fixtures use slugs and placeholder addresses only.
+- There is no `expect.json`: `writes_document` is derived from the exit code, so the two can never disagree.
+- The harness rule holds: a case whose `probe.json` implies a different code than its `exit` file fails. Blind implies `5`, otherwise `overall` maps GREEN/YELLOW/RED to `0`/`1`/`2`.
+- Required cases at S0: green, one-prom-down, both-prom-down, blind, held, expired-hold, `prom_not_ready`, config error (exit `3`, no `probe.json`), I/O error (exit `4`, no `probe.json`).
 
-*To be written by the CLI slice: table columns and truncation, `--help` bar, `validate` output, `version` output, error message style, global flags.*
+## 12. CLI contract (frozen parts)
+
+The rest of this section belongs to the CLI slice.
+
+- Commands: `check`, `validate`, `serve`, `version`. Global flags: `--config`, `--overlay`, `--json`, `--now`, `--out`.
+- `check` prints the table by default; `--json` prints the `simplex.probe/v0` document. Exit codes are identical in both modes.
+- Table columns, in order: `HOST | CHECK | EXPECTED | RESULT | SEVERITY | REASONS`. Reasons are joined with `, ` and truncated to `+N` when the column would overflow. `NO_COLOR` disables color; severity is never carried by color alone.
+- `validate` prints `path[idx].field: message (config line)`, exit `0` with warnings, `3` with errors.
 
 ## 13. Naming freeze
 
 Frozen at S0: commands `check`, `validate`, `serve`, `version`; flags `--json`, `--now`, `--out`, `--config`, `--overlay`; schema file names; document and config field names; the check kinds and reason codes above; the `simplex_` metric prefix. Changes after S1 are breaking.
+
+## 14. Public-tree scrub
+
+Every tracked text file is scanned in CI. The allowlist is exact; anything else fails the job.
+
+| Allowed | Why |
+| --- | --- |
+| `127.0.0.0/8` (any 127.x address) | loopback, in tests and the loopback listen default |
+| `0.0.0.0` | wildcard bind, mentioned only to forbid it |
+| `255.255.255.255` | broadcast literal, documentation |
+| the CIDR literal `100.64.0.0/10` | CGNAT range, needed by blind detection |
+
+- TEST-NET-1 (`192.0.2.0/24`), TEST-NET-2 (`198.51.100.0/24`) and TEST-NET-3 (`203.0.113.0/24`) are warnings, allowed only in docs and fixtures as placeholders.
+- Everything else fails: other IPv4 and IPv6 literals, tailnet IPv6 prefixes, `*.ts.net` and `*.tailnet` names, `*.local`, `*.lan`, private keys, GitHub, cloud and Slack tokens, JWTs, bearer tokens, and `/Users/...` or `/home/...` paths.
+- Emails must end in `example.com`, `example.org` or `users.noreply.github.com`.
+- No tracked file whose base name contains `overlay`, except the overlay schema.
+- The overlay is private user data: if a fix needs a real address, the fix is wrong.
