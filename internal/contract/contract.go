@@ -25,6 +25,10 @@ const (
 // AllowedPaths lists every path an HTTP check may name, in documentation order.
 var AllowedPaths = []string{PathMetrics, PathReady, PathHealthy}
 
+// MetricsListen is the default address `serve` binds: loopback only. It is
+// defined once; the docs and the --help text quote it from here.
+const MetricsListen = "127.0.0.1:10081"
+
 // DeniedPort is never dialed, at config load or in the dialer.
 const DeniedPort = 18080
 

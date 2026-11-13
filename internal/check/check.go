@@ -77,10 +77,17 @@ func (e *RunError) Fields() string {
 	return e.Source + " " + e.Path
 }
 
-// Run executes one full pass.
-func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
-	res := &Result{}
+// prepared is the part of a pass that needs no network: the config, the
+// overlay resolved against it, and the instances to probe.
+type prepared struct {
+	cfg       *config.Config
+	resolved  []overlay.Resolved
+	instances []probe.Instance
+}
 
+// prepare loads the config and overlay and resolves every check. Loader
+// warnings are appended to res even when it fails.
+func prepare(p *Params, d *Deps, res *Result) (*prepared, error) {
 	cfg, findings, err := config.LoadWithClock(p.Config, func() time.Time { return p.Now })
 	for i := range findings {
 		if findings[i].Level == config.LevelWarning {
@@ -88,16 +95,16 @@ func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
 		}
 	}
 	if err != nil {
-		return res, ConfigFailure(p.Config, err)
+		return nil, ConfigFailure(p.Config, err)
 	}
 
 	ov, err := loadOverlay(p.Overlay, d.Getenv)
 	if err != nil {
-		return res, err
+		return nil, err
 	}
 	resolved, err := ov.Resolve(cfg)
 	if err != nil {
-		return res, OverlayFailure(err)
+		return nil, OverlayFailure(err)
 	}
 
 	instances := make([]probe.Instance, len(resolved))
@@ -108,6 +115,26 @@ func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
 			Address: r.Address, Port: r.Port, Path: r.Path,
 		}
 	}
+	return &prepared{cfg: cfg, resolved: resolved, instances: instances}, nil
+}
+
+// Prepare checks that the config and overlay load and resolve, without
+// probing anything. serve runs it once at startup so a bad file exits 3 before
+// a listener is bound.
+func Prepare(p *Params, d *Deps) (*Result, error) {
+	res := &Result{}
+	_, err := prepare(p, d, res)
+	return res, err
+}
+
+// Run executes one full pass.
+func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
+	res := &Result{}
+	pre, err := prepare(p, d, res)
+	if err != nil {
+		return res, err
+	}
+	cfg, resolved, instances := pre.cfg, pre.resolved, pre.instances
 
 	// The vantage is derived from the config's canaries; only the interface
 	// lister is a seam, so a test cannot inject a canary verdict.
@@ -271,6 +298,9 @@ var (
 	slugRe  = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 	indexRe = regexp.MustCompile(`^\[[0-9]+\]$`)
 )
+
+// SafePath is safePath for callers outside the package that log field paths.
+func SafePath(path string) string { return safePath(path) }
 
 // safePath returns path only when every part of it is a field the formats
 // define, an index, or a host slug under "hosts". A loader reports an unknown
