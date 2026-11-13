@@ -90,12 +90,12 @@ wait_http() {
 note "fixture $FIXTURE: its document sets the expectation, its golden is the exposition"
 cp "testdata/$FIXTURE/document.json" "$WORK/document.json"
 mkdir -p "$WORK/served"
-cp "internal/metrics/testdata/$FIXTURE.txt" "$WORK/served/metrics"
+cp "internal/metrics/testdata/$FIXTURE.txt" "$WORK/served/metrics.txt"
 
 note "static exposition on 127.0.0.1:$EXPO_PORT"
 python3 -m http.server "$EXPO_PORT" --directory "$WORK/served" >"$WORK/expo.log" 2>&1 &
 EXPO_PID=$!
-wait_http "http://127.0.0.1:$EXPO_PORT/metrics" 15
+wait_http "http://127.0.0.1:$EXPO_PORT/metrics.txt" 15
 
 note "Prometheus on 127.0.0.1:$PROM_PORT"
 cat >"$WORK/prometheus.yml" <<YAML
@@ -104,6 +104,9 @@ global:
   evaluation_interval: 1s
 scrape_configs:
   - job_name: simplex
+    # The exposition is served as metrics.txt so the static server sends
+    # text/plain; Prometheus refuses a body with an unknown content type.
+    metrics_path: /metrics.txt
     static_configs:
       - targets: ["127.0.0.1:$EXPO_PORT"]
 YAML
@@ -192,7 +195,12 @@ for _ in $(seq 1 30); do
 	fi
 	sleep 1
 done
-[ "$(query_len 'simplex_build_info')" != "0" ] || fail "Prometheus never scraped the exposition"
+if [ "$(query_len 'simplex_build_info')" = "0" ]; then
+	note "Prometheus targets, for the failure record"
+	curl -fsS "http://127.0.0.1:$PROM_PORT/api/v1/targets" |
+		jq -r '.data.activeTargets[] | "\(.scrapeUrl) health=\(.health) error=\(.lastError // "-")"' >&2 || true
+	fail "Prometheus never scraped the exposition"
+fi
 
 note "each expression returns what the fixture implies"
 VANTAGE=$(jq -r .vantage.status "$WORK/document.json")
