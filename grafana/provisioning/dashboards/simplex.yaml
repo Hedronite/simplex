@@ -1,8 +1,11 @@
-# Provisioning for the Simplex dashboard. The file provider loads every
-# dashboard JSON under the standard dashboards directory, which is where this
-# repository's grafana/dashboards/simplex.json is placed on the host.
-# Seating the file there is a separate deployment decision; provisioning
-# config for an existing Grafana is all this slice ships.
+# Provisioning for the Simplex dashboard. The file provider scans its own
+# subdirectory /var/lib/grafana/dashboards/simplex, where this repository's
+# grafana/dashboards/simplex.json goes. A directory of its own keeps Grafana
+# from loading the dashboard twice: the existing provider on a host already
+# scans /var/lib/grafana/dashboards, and two providers finding the same uid
+# is a provisioning error. Seating the file there is a separate deployment
+# decision; provisioning config for an existing Grafana is all this slice
+# ships.
 apiVersion: 1
 
 providers:
@@ -15,5 +18,5 @@ providers:
     updateIntervalSeconds: 30
     allowUiUpdates: false
     options:
-      path: /var/lib/grafana/dashboards
+      path: /var/lib/grafana/dashboards/simplex
       foldersFromFilesStructure: false

@@ -178,7 +178,12 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 		ErrorLog: log.New(io.Discard, "", 0),
 	}
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- srv.Serve(ln) }()
+	go func() {
+		if deps.beforeServe != nil {
+			deps.beforeServe()
+		}
+		serveErr <- srv.Serve(ln)
+	}()
 
 	loopCtx, stopLoop := context.WithCancel(ctx)
 	defer stopLoop()
@@ -189,9 +194,11 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 	}()
 
 	var fatal error
+	serveDone := false
 	select {
 	case <-ctx.Done():
 	case err := <-serveErr:
+		serveDone = true
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			fatal = failure.Runtime(err, "serve: metrics server stopped")
 		}
@@ -201,6 +208,19 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 	sctx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 	defer cancel()
 	_ = srv.Shutdown(sctx)
+	// Shutdown closes the listener, but the goroutine running Serve closes it
+	// on its own schedule. Wait for that goroutine, so the port is released
+	// before serve returns and a caller can rebind it at once.
+	if !serveDone {
+		select {
+		case err := <-serveErr:
+			if err != nil && !errors.Is(err, http.ErrServerClosed) && fatal == nil {
+				fatal = failure.Runtime(err, "serve: metrics server stopped")
+			}
+		case <-sctx.Done():
+		}
+	}
+	_ = ln.Close()
 	logger.Printf("stopped")
 	return fatal
 }

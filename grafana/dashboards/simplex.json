@@ -185,7 +185,7 @@
         "type": "prometheus",
         "uid": "lea-prom"
       },
-      "description": "Age of the served document, computed at scrape. Thresholds are multiples of the scrape interval: a wedged probe loop or a stalled serve shows as an aging document.",
+      "description": "Age of the served document, computed at scrape, with the last run's wall-clock time beside it. Thresholds are multiples of the run interval: yellow at 3 x interval (90 s at the default 30 s), red at 20 x interval (600 s at the default 30 s). A wedged probe loop or a stalled serve shows as an aging document.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -211,7 +211,27 @@
           },
           "unit": "s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last run"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -245,6 +265,16 @@
           "instant": true,
           "legendFormat": "document age",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "lea-prom"
+          },
+          "expr": "simplex_last_run_timestamp_seconds * 1000",
+          "instant": true,
+          "legendFormat": "last run",
+          "refId": "B"
         }
       ],
       "title": "Document freshness",
