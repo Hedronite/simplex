@@ -94,11 +94,12 @@ func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.
 		}
 	}
 
-	prober := deps.Vantage
-	if prober == nil {
-		prober = vantage.New(vantage.Options{Canaries: canaries(cfg, instances, deps.Runner)})
-	}
-	status := prober.Status(ctx)
+	// The vantage is derived from the config's canaries; only the interface
+	// lister is a seam, so a test cannot inject a canary verdict.
+	status := vantage.New(vantage.Options{
+		Lister:   deps.Lister,
+		Canaries: canaries(cfg, instances, deps.Runner),
+	}).Status(ctx)
 
 	// A blind vantage cannot trust anything it would see, so nothing is dialed.
 	observed := make([]probe.Observation, len(instances))
