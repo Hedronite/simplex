@@ -97,6 +97,23 @@
         }
       }
     },
+    "tailscale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["localapi"],
+      "description": "Optional enrichment from the local Tailscale daemon. Informational only: it never changes a result or a severity.",
+      "properties": {
+        "localapi": {
+          "type": "boolean",
+          "description": "Read peer state and path from the local tailscaled LocalAPI. Off by default."
+        },
+        "socket": {
+          "type": "string",
+          "pattern": "^/[^/\\s][^\\s]*$",
+          "description": "Absolute path of the LocalAPI unix socket. Anything else (a host:port, a URL, a relative path) is a config error. Used only when localapi is true; the default is the platform socket."
+        }
+      }
+    },
     "holds": {
       "type": "array",
       "description": "Announced, temporary darks. Expired holds are ignored and validate warns.",
