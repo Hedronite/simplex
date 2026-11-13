@@ -26,6 +26,7 @@ The enum is open: adding a kind is a minor change. A check instance is identifie
 - `expected` (`light` or `dark`) is **required on every check**, in config and in the document. There is no per-kind default.
 - Port 18080 is never dialed. Config load rejects any check that names it, and the dialer refuses it too.
 - `prom_up` path comes from an allowlist: `/metrics`, `/-/ready`, `/-/healthy`; default `/-/ready`. HTTP only, host must be an overlay slug, no userinfo, no query, no redirects, 1 MiB body cap.
+- `kube_apiserver` is a TCP connect to `:6443` and nothing more: no TLS handshake, no HTTP request, no credentials. Another project owns TLS and everything above the connect, so a closed or filtered port is the only thing this kind can report.
 - `lan_reach` and `ssh` land in the third S1 slice. Their rows are intent. The kind names are frozen.
 
 ## 3. Result classification
