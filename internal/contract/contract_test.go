@@ -54,3 +54,31 @@ func TestSemanticsDocumentsEveryCode(t *testing.T) {
 		check("kind", string(k))
 	}
 }
+
+// The reason set is frozen at exactly these 16 codes.
+func TestReasonSetIsFrozen(t *testing.T) {
+	want := []Reason{
+		"expected_dark", "unexpected_light", "unexpected_dark", "held",
+		"vantage_blind", "probe_unknown", "prom_not_ready", "prom_auth",
+		"metrics_body_unexpected", "prom_pair_down", "prom_pair_degraded",
+		"tcp_connect_ok", "tcp_connect_refused", "tcp_connect_timeout",
+		"http_timeout", "http_unexpected_status",
+	}
+	got := map[Reason]bool{}
+	for _, c := range ReasonCodes() {
+		got[c] = true
+	}
+	if len(got) != len(want) {
+		t.Fatalf("have %d reason codes, want %d", len(got), len(want))
+	}
+	for _, c := range want {
+		if !got[c] {
+			t.Errorf("missing reason code %q", c)
+		}
+	}
+	for _, c := range []Reason{"watchdog_only", "probe_timeout"} {
+		if got[c] {
+			t.Errorf("reason code %q must not exist", c)
+		}
+	}
+}

@@ -107,9 +107,6 @@ const (
 	ReasonTCPConnectOK         Reason = "tcp_connect_ok"
 	ReasonTCPConnectRefused    Reason = "tcp_connect_refused"
 	ReasonTCPConnectTimeout    Reason = "tcp_connect_timeout"
-	ReasonUnreachable          Reason = "unreachable"
-	ReasonDNSError             Reason = "dns_error"
-	ReasonHTTPOK               Reason = "http_ok"
 	ReasonHTTPTimeout          Reason = "http_timeout"
 	ReasonHTTPUnexpectedStatus Reason = "http_unexpected_status"
 	ReasonPromNotReady         Reason = "prom_not_ready"
@@ -138,9 +135,6 @@ var ReasonSpecs = []ReasonSpec{
 	{ReasonTCPConnectOK, ClassOutcome},
 	{ReasonTCPConnectRefused, ClassOutcome},
 	{ReasonTCPConnectTimeout, ClassOutcome},
-	{ReasonUnreachable, ClassOutcome},
-	{ReasonDNSError, ClassOutcome},
-	{ReasonHTTPOK, ClassOutcome},
 	{ReasonHTTPTimeout, ClassOutcome},
 	{ReasonHTTPUnexpectedStatus, ClassOutcome},
 	{ReasonPromNotReady, ClassOutcome},
