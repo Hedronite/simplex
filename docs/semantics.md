@@ -295,11 +295,11 @@ Three overlay situations, per command:
 | `--listen ADDR` | `127.0.0.1:10081` | address for `GET /metrics`; loopback only unless `--unsafe-allow-non-loopback` is given |
 | `--interval DURATION` | `30s` | time between pass starts; runs never overlap, and an overrun skips the slots it missed |
 | `--deadline DURATION` | `15s` | time one pass may take; must be positive and at most `--interval` |
-| `--unsafe-allow-non-loopback` | off | allow a `--listen` address that is not loopback; prints a warning on every start, because `/metrics` has no authentication |
+| `--unsafe-allow-non-loopback` | off | allow a `--listen` address that is not loopback; prints a warning on every start that binds a non-loopback address, because `/metrics` has no authentication |
 
 `--config`, `--overlay` and `--out` are as in the global flags table; with `--out`, `serve` is the writer of record for the document file (section 11).
 
-- **Loopback rule.** Only `localhost` and loopback IP literals count as loopback. Names are never resolved, so the answer does not depend on a lookup. The flag name is explicit by design and is never inferred from a hostname.
+- **Loopback rule.** Only `localhost` and loopback IP literals count as loopback. Names are never resolved, so the answer does not depend on a lookup. An empty host (`:10081`, which binds all interfaces), `0.0.0.0` and `[::]` are not loopback and are refused without the flag; the flag on a loopback address prints no warning, since nothing is exposed. The flag name is explicit by design and is never inferred from a hostname.
 - **Surface.** `GET /metrics` only. Any other method on it is `405` with `Allow: GET` (`HEAD` included), every other path is `404`, and there are no debug handlers. The metrics are the series in `docs/metrics.md`.
 - **Exit codes.** `0` after `SIGINT` or `SIGTERM` (the pass in flight finishes). `3` for a bad flag, or a config or overlay that does not load, checked before anything is bound. `4` when the address cannot be bound or the server fails, naming the address. `serve` never exits on severity.
 - **After startup, failures are non-fatal.** A failing pass is counted in `simplex_run_errors_total` and logged; the last good snapshot stays served, so `simplex_document_age_seconds` shows an aging document rather than a gap. A failed `--out` write counts as a failed pass.
