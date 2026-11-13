@@ -119,9 +119,15 @@ docker_run simplex-prom \
 wait_http "http://127.0.0.1:$PROM_PORT/-/ready" 60
 
 note "Grafana on 127.0.0.1:$GRAFANA_PORT, provisioning from files"
-mkdir -p "$WORK/provisioning/dashboards" "$WORK/provisioning/datasources" "$WORK/dashboards"
+# The directory the dashboard goes in is the provider's own `options.path`, read
+# from the file rather than repeated here: a provider that moves its path would
+# otherwise leave this job mounting a directory nobody scans, and the failure
+# would look like a Grafana problem.
+DASH_DIR=$(sed -n 's/^[[:space:]]*path:[[:space:]]*//p' "$PROVIDER" | tail -n 1 | tr -d '"' | tr -d "\r")
+[ -n "$DASH_DIR" ] || fail "the provider file names no dashboards path"
+mkdir -p "$WORK/provisioning/dashboards" "$WORK/provisioning/datasources" "$WORK/rootfs$DASH_DIR"
 cp "$PROVIDER" "$WORK/provisioning/dashboards/simplex.yaml"
-cp "$DASHBOARD" "$WORK/dashboards/simplex.json"
+cp "$DASHBOARD" "$WORK/rootfs$DASH_DIR/"
 cat >"$WORK/provisioning/datasources/simplex.yaml" <<YAML
 apiVersion: 1
 datasources:
@@ -140,11 +146,11 @@ docker_run simplex-grafana \
 	-e GF_SECURITY_ADMIN_PASSWORD=throwaway-ci-only \
 	-e GF_AUTH_ANONYMOUS_ENABLED=false \
 	-v "$WORK/provisioning:/etc/grafana/provisioning:ro" \
-	-v "$WORK/dashboards:/var/lib/grafana/dashboards:ro" \
+	-v "$WORK/rootfs$DASH_DIR:$DASH_DIR:ro" \
 	"$GRAFANA_IMAGE"
 wait_http "http://127.0.0.1:$GRAFANA_PORT/api/health" 90
 
-note "the dashboard is served under its frozen uid, from the provider path"
+note "the dashboard is served under its frozen uid, from the provider path $DASH_DIR"
 curl -fsS -u "admin:throwaway-ci-only" \
 	"http://127.0.0.1:$GRAFANA_PORT/api/dashboards/uid/$DASHBOARD_UID" >"$WORK/served-dashboard.json" ||
 	fail "GET /api/dashboards/uid/$DASHBOARD_UID failed"
