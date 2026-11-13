@@ -61,7 +61,7 @@ document; exits 3 and 4 never do.`,
 
 func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.Writer) error {
 	if !f.json {
-		return failure.Config("check: the table output is not available yet (pass --json)")
+		return failure.Config("check: the table output arrives with the CLI slice (pass --json for now)")
 	}
 	now, err := runClock(f.now, deps.Now)
 	if err != nil {
@@ -96,11 +96,12 @@ func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.
 		}
 	}
 
-	prober := deps.Vantage
-	if prober == nil {
-		prober = vantage.New(vantage.Options{Canaries: canaries(cfg, instances, deps.Runner)})
-	}
-	status := prober.Status(ctx)
+	// The vantage is derived from the config's canaries; only the interface
+	// lister is a seam, so a test cannot inject a canary verdict.
+	status := vantage.New(vantage.Options{
+		Lister:   deps.Lister,
+		Canaries: canaries(cfg, instances, deps.Runner),
+	}).Status(ctx)
 
 	// A blind vantage cannot trust anything it would see, so nothing is dialed.
 	observed := make([]probe.Observation, len(instances))

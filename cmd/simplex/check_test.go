@@ -19,7 +19,6 @@ import (
 	"github.com/Hedronite/simplex/internal/exitcode"
 	"github.com/Hedronite/simplex/internal/overlay"
 	"github.com/Hedronite/simplex/internal/probe"
-	"github.com/Hedronite/simplex/internal/vantage"
 )
 
 type result struct {
@@ -113,16 +112,7 @@ func fixtureDeps(t *testing.T, doc *document.Document, ovPath string) *Deps {
 		Transport: fakeTransport{plans: https},
 		Clock:     instantClock{},
 	})
-	var prober *vantage.Prober
-	switch doc.Vantage.Status {
-	case contract.VantageOK:
-		prober = vantage.New(vantage.Options{Lister: fakeLister(true), Canaries: []vantage.Canary{func(context.Context) bool { return true }}})
-	case contract.VantageUnchecked:
-		prober = vantage.New(vantage.Options{Lister: fakeLister(true)})
-	default:
-		prober = vantage.New(vantage.Options{Lister: fakeLister(false)})
-	}
-	return &Deps{Runner: runner, Vantage: prober, Getenv: func(string) string { return "" }, Now: time.Now}
+	return &Deps{Runner: runner, Lister: fakeLister(doc.Vantage.Status != contract.VantageBlind), Getenv: func(string) string { return "" }, Now: time.Now}
 }
 
 func readFile(t *testing.T, path string) []byte {
@@ -183,7 +173,7 @@ func TestFixturesReproduceThroughCheck(t *testing.T) {
 				deps := &Deps{Runner: probe.New(&probe.Options{
 					Dialer: fakeDialer{plans: map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}},
 					Clock:  instantClock{},
-				}), Vantage: vantage.New(vantage.Options{Lister: fakeLister(true)}), Now: time.Now, Getenv: func(string) string { return "" }}
+				}), Lister: fakeLister(true), Now: time.Now, Getenv: func(string) string { return "" }}
 				args := []string{"check", "--json", "--config", cfgPath, "--overlay", ovPath, "--now", "2026-11-13T18:00:00Z"}
 				if wantCode == exitcode.Runtime {
 					// An I/O error: the output directory does not exist.
@@ -237,10 +227,10 @@ func tinyFiles(t *testing.T) (cfg, ov string) {
 
 func upDeps() *Deps {
 	return &Deps{
-		Runner:  fakeRunner(map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}),
-		Vantage: vantage.New(vantage.Options{Lister: fakeLister(true)}),
-		Now:     func() time.Time { return time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC) },
-		Getenv:  func(string) string { return "" },
+		Runner: fakeRunner(map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}),
+		Lister: fakeLister(true),
+		Now:    func() time.Time { return time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC) },
+		Getenv: func(string) string { return "" },
 	}
 }
 
@@ -360,7 +350,7 @@ func TestOutFileMatchesStdoutAndFollowsTheWriteRules(t *testing.T) {
 func TestBlindWritesTheDocumentAndExitsFive(t *testing.T) {
 	cfg, ov := tinyFiles(t)
 	deps := upDeps()
-	deps.Vantage = vantage.New(vantage.Options{Lister: fakeLister(false)})
+	deps.Lister = fakeLister(false)
 	out := filepath.Join(t.TempDir(), "probe.json")
 	r := invoke(t, deps, "check", "--json", "--config", cfg, "--overlay", ov, "--out", out)
 	if r.code != exitcode.Blind {
@@ -379,7 +369,8 @@ func TestBlindWritesTheDocumentAndExitsFive(t *testing.T) {
 }
 
 // Canaries from the config become real probes through the same runner: one
-// that answers makes the vantage ok, and none that answer makes it blind.
+// that answers makes the vantage ok, and one that does not makes it blind and
+// exits 5. Only the interface lister and the dial results are faked.
 func TestConfigCanariesDriveTheVantage(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "c.yaml")
@@ -394,33 +385,26 @@ func TestConfigCanariesDriveTheVantage(t *testing.T) {
 	silent := map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUnknown, outcome: contract.ReasonTCPConnectTimeout}}
 	for name, tc := range map[string]struct {
 		plans  map[string]plan
+		lister bool
 		status contract.VantageStatus
 		code   int
 	}{
-		"canary answers": {answering, contract.VantageOK, exitcode.Green},
-		"canary silent":  {silent, contract.VantageBlind, exitcode.Blind},
+		"canary answers":     {answering, true, contract.VantageOK, exitcode.Green},
+		"canary silent":      {silent, true, contract.VantageBlind, exitcode.Blind},
+		"no tailnet address": {answering, false, contract.VantageBlind, exitcode.Blind},
 	} {
 		t.Run(name, func(t *testing.T) {
-			deps := &Deps{Runner: fakeRunner(tc.plans), Now: time.Now, Getenv: func(string) string { return "" }}
-			// The lister is the real one, so pin it by building the prober with
-			// the canaries the command would build.
-			c, _, err := config.Load(cfg)
-			if err != nil {
+			deps := &Deps{Runner: fakeRunner(tc.plans), Lister: fakeLister(tc.lister), Now: time.Now, Getenv: func(string) string { return "" }}
+			r := invoke(t, deps, "check", "--json", "--config", cfg, "--overlay", ov, "--now", "2026-11-13T18:00:00Z")
+			if r.code != tc.code {
+				t.Fatalf("exit %d, want %d (stderr %q)", r.code, tc.code, r.stderr)
+			}
+			var d document.Document
+			if err := json.Unmarshal([]byte(r.stdout), &d); err != nil {
 				t.Fatal(err)
 			}
-			_ = c
-			deps.Vantage = nil
-			// Without a Vantage the command reads the real interfaces; on a machine
-			// off the tailnet that is blind whatever the canaries say, so only the
-			// blind case is machine-independent. The canary wiring itself is
-			// covered through canaries() below.
-			cs := canaries(c, []probe.Instance{{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "tower.invalid", Port: 9100}}, deps.Runner)
-			if len(cs) != 1 {
-				t.Fatalf("want one canary, got %d", len(cs))
-			}
-			status := vantage.New(vantage.Options{Lister: fakeLister(true), Canaries: cs}).Status(context.Background())
-			if status != tc.status {
-				t.Fatalf("status %s, want %s", status, tc.status)
+			if d.Vantage.Status != tc.status {
+				t.Fatalf("status %s, want %s", d.Vantage.Status, tc.status)
 			}
 		})
 	}
@@ -454,10 +438,10 @@ func TestRealDialerAgainstALoopbackListener(t *testing.T) {
 		t.Fatal(err)
 	}
 	deps := &Deps{
-		Runner:  probe.Default(),
-		Vantage: vantage.New(vantage.Options{Lister: fakeLister(true)}),
-		Now:     time.Now,
-		Getenv:  func(string) string { return "" },
+		Runner: probe.Default(),
+		Lister: fakeLister(true),
+		Now:    time.Now,
+		Getenv: func(string) string { return "" },
 	}
 	r := invoke(t, deps, "check", "--json", "--config", cfg, "--overlay", ov)
 	if r.code != exitcode.Green {

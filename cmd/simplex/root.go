@@ -23,9 +23,9 @@ import (
 type Deps struct {
 	// Runner probes the resolved checks.
 	Runner *probe.Runner
-	// Vantage decides the vantage status. Nil means: build it from the
-	// config's canaries, reading the real interfaces.
-	Vantage *vantage.Prober
+	// Lister answers whether this machine has a tailnet address. Nil means
+	// the real interface reader. The canaries always come from the config.
+	Lister vantage.Lister
 	// Now is the clock used when --now is not given.
 	Now func() time.Time
 	// Getenv reads the environment (SIMPLEX_OVERLAY).
