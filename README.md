@@ -147,7 +147,7 @@ hosts:
       - {kind: kube_apiserver, expected: dark}
 holds:                            # temporary announced darks; all fields required
   - {host: tower, kind: ts_reach, reason: planned maintenance,
-     until: 2026-12-01T00:00:00Z}
+     until: 2030-01-01T00:00:00Z}
 ```
 
 - `expected` (`light` or `dark`) is required on every check; there is no
