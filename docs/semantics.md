@@ -286,14 +286,29 @@ Three overlay situations, per command:
 - Errors print `<what>: <why> (<hint>)`, one line, no stack traces: `config hosts.yaml: unknown key "pot" (line 7)`. A usage error names the offending flag or field; a config error names the file and field path as in `validate` output.
 - Under `--json`, error exits (3 and 4) additionally write the `{"error":{"code","message"}}` object of section 10 to stderr.
 
-### Serve and later flags
+### serve
 
-- `serve` runs the probe on an interval and never exits on severity (section 10). Its listen address and interval flags are S1 decisions and join the naming freeze when they land; until then the metrics address is provisional `127.0.0.1:10081`.
-- Per-command flags beyond the five global ones must not shadow or reparse what a global flag already decides.
+`simplex serve` runs the same pass as `check` on an interval and serves the latest result as Prometheus metrics. It has no `--json` flag: its startup errors are one plain text line (`simplex: <what>`), and its journal lines use field paths only.
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--listen ADDR` | `127.0.0.1:10081` | address for `GET /metrics`; loopback only unless `--unsafe-allow-non-loopback` is given |
+| `--interval DURATION` | `30s` | time between pass starts; runs never overlap, and an overrun skips the slots it missed |
+| `--deadline DURATION` | `15s` | time one pass may take; must be positive and at most `--interval` |
+| `--unsafe-allow-non-loopback` | off | allow a `--listen` address that is not loopback; prints a warning on every start, because `/metrics` has no authentication |
+
+`--config`, `--overlay` and `--out` are as in the global flags table; with `--out`, `serve` is the writer of record for the document file (section 11).
+
+- **Loopback rule.** Only `localhost` and loopback IP literals count as loopback. Names are never resolved, so the answer does not depend on a lookup. The flag name is explicit by design and is never inferred from a hostname.
+- **Surface.** `GET /metrics` only. Any other method on it is `405` with `Allow: GET` (`HEAD` included), every other path is `404`, and there are no debug handlers. The metrics are the series in `docs/metrics.md`.
+- **Exit codes.** `0` after `SIGINT` or `SIGTERM` (the pass in flight finishes). `3` for a bad flag, or a config or overlay that does not load, checked before anything is bound. `4` when the address cannot be bound or the server fails, naming the address. `serve` never exits on severity.
+- **After startup, failures are non-fatal.** A failing pass is counted in `simplex_run_errors_total` and logged; the last good snapshot stays served, so `simplex_document_age_seconds` shows an aging document rather than a gap. A failed `--out` write counts as a failed pass.
+- **Logging is by field path only.** A journal line names where a pass failed (for example `config vantage.canaries[0].host`), never a message or a value from a private file. A startup failure prints the same field path and points at `simplex validate`. A path that is not a defined field name, an index or a host slug is dropped.
+- Per-command flags beyond the global ones must not shadow or reparse what a global flag already decides.
 
 ## 13. Naming freeze
 
-Frozen at S0: commands `check`, `validate`, `serve`, `version`; flags `--json`, `--now`, `--out`, `--config`, `--overlay`; schema file names; document and config field names; the check kinds and reason codes above; the `simplex_` metric prefix. Changes after S1 are breaking.
+Frozen at S0: commands `check`, `validate`, `serve`, `version`; flags `--json`, `--now`, `--out`, `--config`, `--overlay`. Frozen at S2: the `serve` flags `--listen`, `--interval`, `--deadline` and `--unsafe-allow-non-loopback`, and the default listen address `127.0.0.1:10081`. Also frozen: schema file names; document and config field names; the check kinds and reason codes above; the `simplex_` metric prefix. Changes after S1 are breaking.
 
 ## 14. Public-tree scrub
 
