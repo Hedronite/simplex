@@ -271,7 +271,7 @@
             "type": "prometheus",
             "uid": "lea-prom"
           },
-          "expr": "simplex_last_run_timestamp_seconds",
+          "expr": "simplex_last_run_timestamp_seconds * 1000",
           "instant": true,
           "legendFormat": "last run",
           "refId": "B"
