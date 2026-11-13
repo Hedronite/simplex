@@ -215,6 +215,42 @@ var negativeCases = []struct {
 	name string
 	doc  string
 }{
+	{"config", "no_checks_at_all", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {"id": "lathe"},
+  "hosts": [{"id": "tower"}]
+}`},
+	{"config", "path_on_a_tcp_kind", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {"id": "lathe"},
+  "hosts": [{"id": "tower", "checks": [{"kind": "ts_reach", "expected": "light", "path": "/metrics"}]}]
+}`},
+	{"config", "host_with_empty_checks", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {"id": "lathe"},
+  "hosts": [{"id": "tower", "checks": []}, {"id": "box", "checks": [{"kind": "prom_up", "expected": "light"}]}]
+}`},
+	{"overlay", "path_on_a_tcp_kind", `{
+  "apiVersion": "simplex.overlay/v0",
+  "hosts": {"tower": {"address": "placeholder.invalid", "overrides": [{"kind": "ts_reach", "path": "/metrics"}]}}
+}`},
+	{"probe", "empty_hosts", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {"id": "lathe", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [],
+  "checks": [{"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
+              "severity": "GREEN", "expected": "light", "reasons": []}]
+}`},
+	{"probe", "empty_checks", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {"id": "lathe", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [{"id": "tower", "severity": "GREEN", "reasons": []}],
+  "checks": []
+}`},
 	{"config", "canary_of_wrong_kind", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
@@ -1177,4 +1213,93 @@ func TestEverySchemaEnumValueIsSnakeOrKnown(t *testing.T) {
 		}
 		walk(loadSchemaJSON(t, kind), "")
 	}
+}
+
+// TestCanaryReferencesUseTheEffectiveTarget pins the ruling that a canary
+// names the check's effective target: the kind's default port, plus the
+// configured path, after any override. A canary written `:9100` therefore
+// matches a `ts_reach` check that sets no port.
+func TestCanaryReferencesUseTheEffectiveTarget(t *testing.T) {
+	type canary struct {
+		Host   string `json:"host"`
+		Kind   string `json:"kind"`
+		Target string `json:"target"`
+	}
+	var cfg struct {
+		Vantage struct {
+			Canaries []canary `json:"canaries"`
+		} `json:"vantage"`
+		Hosts []struct {
+			ID     string `json:"id"`
+			Checks []struct {
+				Kind string `json:"kind"`
+				Port *int   `json:"port"`
+				Path string `json:"path"`
+			} `json:"checks"`
+		} `json:"hosts"`
+	}
+	raw, err := os.ReadFile(filepath.Join("testdata", "valid", "config.json"))
+	if err != nil {
+		t.Fatalf("read valid config: %v", err)
+	}
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("valid config is not JSON: %v", err)
+	}
+	if len(cfg.Vantage.Canaries) == 0 {
+		t.Fatal("the valid corpus carries no canary, so the rule would go untested")
+	}
+	for _, c := range cfg.Vantage.Canaries {
+		want, ok := effectiveTargetFor(cfg.Hosts, c.Host, c.Kind)
+		if !ok {
+			t.Fatalf("canary %s/%s names no configured check", c.Host, c.Kind)
+		}
+		if c.Target != want {
+			t.Fatalf("canary %s/%s target %q, the effective target is %q", c.Host, c.Kind, c.Target, want)
+		}
+	}
+}
+
+// effectiveTargetFor resolves one configured instance the way the probe does.
+func effectiveTargetFor(hosts []struct {
+	ID     string `json:"id"`
+	Checks []struct {
+		Kind string `json:"kind"`
+		Port *int   `json:"port"`
+		Path string `json:"path"`
+	} `json:"checks"`
+}, slug, kind string) (string, bool) {
+	port := 0
+	path := ""
+	switch contract.Kind(kind) {
+	case contract.KindTSReach, contract.KindNodeExporter:
+		port = 9100
+	case contract.KindKubeAPIServer:
+		port = 6443
+	case contract.KindLANReach, contract.KindSSH:
+		port = 22
+	case contract.KindPromUp:
+		port = 9090
+		path = contract.PathReady
+	}
+	if contract.Kind(kind) == contract.KindNodeExporter {
+		path = contract.PathMetrics
+	}
+	for _, h := range hosts {
+		if h.ID != slug {
+			continue
+		}
+		for _, c := range h.Checks {
+			if c.Kind != kind {
+				continue
+			}
+			if c.Port != nil {
+				port = *c.Port
+			}
+			if c.Path != "" {
+				path = c.Path
+			}
+			return fmt.Sprintf(":%d%s", port, path), true
+		}
+	}
+	return "", false
 }

@@ -47,11 +47,11 @@
     "hosts": {
       "type": "array",
       "minItems": 1,
-      "description": "A host with no checks is allowed and produces no document entry.",
+      "description": "Every host declares at least one check, so no run can produce a vacuous GREEN.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id"],
+        "required": ["id", "checks"],
         "properties": {
           "id": {
             "type": "string",
@@ -59,10 +59,20 @@
           },
           "checks": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": false,
               "required": ["kind", "expected"],
+              "allOf": [
+                {
+                  "if": {
+                    "required": ["kind"],
+                    "properties": {"kind": {"const": "prom_up"}}
+                  },
+                  "else": {"not": {"required": ["path"]}}
+                }
+              ],
               "properties": {
                 "kind": {
                   "enum": ["ts_reach", "lan_reach", "node_exporter", "prom_up", "kube_apiserver", "ssh"]
@@ -78,7 +88,8 @@
                   "description": "Set only for a check that needs a different port from the kind default."
                 },
                 "path": {
-                  "enum": ["/metrics", "/-/ready", "/-/healthy"]
+                  "enum": ["/metrics", "/-/ready", "/-/healthy"],
+                  "description": "Legal only when kind is prom_up; any other kind naming a path is a config error."
                 }
               }
             }
