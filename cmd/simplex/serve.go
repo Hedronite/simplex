@@ -178,7 +178,12 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 		ErrorLog: log.New(io.Discard, "", 0),
 	}
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- srv.Serve(ln) }()
+	go func() {
+		if deps.beforeServe != nil {
+			deps.beforeServe()
+		}
+		serveErr <- srv.Serve(ln)
+	}()
 
 	loopCtx, stopLoop := context.WithCancel(ctx)
 	defer stopLoop()
