@@ -225,14 +225,59 @@ Consumers such as Vigil read the document from a file and never run `simplex`.
 
 S1 tests for `--out`: the temp file is in the target directory; the target is replaced by rename, never truncated in place; a prior good file is byte-identical after an exit 3 or 4 run; exit 5 writes a document with `vantage.status: blind`; mode is `0644`; no temp file remains after success or failure; `serve --out` writes the bytes the `/metrics` snapshot was built from.
 
-## 12. CLI contract (frozen parts)
-
-The rest of this section belongs to the CLI slice.
+## 12. CLI contract
 
 - Commands: `check`, `validate`, `serve`, `version`. Global flags: `--config`, `--overlay`, `--json`, `--now`, `--out`.
 - `check` prints the table by default; `--json` prints the `simplex.probe/v0` document. Exit codes are identical in both modes.
 - Table columns, in order: `HOST | CHECK | EXPECTED | RESULT | SEVERITY | REASONS`. Reasons are joined with `, ` and truncated to `+N` when the column would overflow. `NO_COLOR` disables color; severity is never carried by color alone.
 - `validate` prints `path[idx].field: message (config line)`, exit `0` with warnings, `3` with errors.
+
+### Streams
+
+`stdout` carries only rendered output: the table, the `--json` document, `validate` findings, the `version` line. `stderr` carries diagnostics: errors, warnings, and the error object of section 10. The two are never mixed, so piping stdout stays parseable in every mode.
+
+### Global flags
+
+| Flag | Commands | Meaning |
+| --- | --- | --- |
+| `--config PATH` | `check`, `validate`, `serve` | config file; default `simplex.yaml` in the working directory |
+| `--overlay PATH` | `check`, `serve` | overlay file; resolution order is this flag, then `SIMPLEX_OVERLAY`, then `simplex.overlay.yaml` when present |
+| `--json` | `check`, `validate`, `version` | print the document, the findings JSON, or the JSON version object instead of the human form |
+| `--now RFC3339` | `check`, `validate` | pins `generated_at` and the hold clock together (section 11); used for reproducible fixtures |
+| `--out PATH` | `check`, `serve` | write the `--json` document to a file (section 11) |
+
+A missing overlay file is not by itself an error; a check that needs an address with no overlay entry fails closed per section 8. `--config` pointing at a missing or invalid file is exit 3.
+
+### Cell contents and color
+
+- The `CHECK` cell is `kind` and `target` separated by one space, using the effective target after overlay overrides (section 8). The `HOST` and `EXPECTED` cells carry the slug and the configured expectation. A held check keeps its real result in `RESULT` and carries `held` among `REASONS`.
+- Severity color applies only when stdout is a terminal and `NO_COLOR` is unset; the severity word is always printed. `EXPECTED`, `RESULT` and `REASONS` are never colored, so greyscale output loses nothing but emphasis.
+
+### Help
+
+- Bare `simplex` and `simplex help` print the command index: one line per command with a one-sentence purpose. Global flags are listed once here.
+- `simplex <command> --help` fits one screen: purpose, flags with defaults, the exit codes that command can produce, and whether it writes a document.
+
+### validate output
+
+- Findings print in config order, one per line, in the frozen `path[idx].field: message (config line)` form, to stdout. Both warnings and errors appear.
+- With any error, a summary line naming the finding count goes to stderr and the exit is `3`; with warnings only the exit is `0`.
+- `validate --json` prints `{"findings":[{"level","path","message","line"}]}` to stdout (section 10): one object per finding, `level` is `warning` or `error`, `line` is the 1-based config line when known and `0` otherwise.
+
+### version
+
+- `simplex version` prints `simplex <semver>` and exits `0` in every state.
+- `simplex version --json` prints `{"version": "...", "commit": "...", "built": "..."}` on one line.
+
+### Error style
+
+- Errors print `<what>: <why> (<hint>)`, one line, no stack traces: `config hosts.yaml: unknown key "pot" (line 7)`. A usage error names the offending flag or field; a config error names the file and field path as in `validate` output.
+- Under `--json`, error exits (3 and 4) additionally write the `{"error":{"code","message"}}` object of section 10 to stderr.
+
+### Serve and later flags
+
+- `serve` runs the probe on an interval and never exits on severity (section 10). Its listen address and interval flags are S1 decisions and join the naming freeze when they land; until then the metrics address is provisional `127.0.0.1:10081`.
+- Per-command flags beyond the five global ones must not shadow or reparse what a global flag already decides.
 
 ## 13. Naming freeze
 

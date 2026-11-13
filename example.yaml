@@ -1,0 +1,36 @@
+# Simplex example configuration (simplex.config/v0).
+# Slugs only: addresses live in a private overlay file that is never
+# committed. See docs/semantics.md section 8 for the full contract.
+apiVersion: simplex.config/v0
+
+# The vantage is the host this binary runs on. Canaries are references to
+# configured ts_reach checks; if every canary fails, the vantage is blind
+# (exit 5) instead of reporting a false mesh-wide RED.
+vantage:
+  id: lathe
+  canaries:
+    - {host: tower, kind: ts_reach, target: ":9100"}
+
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}           # target defaults to ":9100"
+      - {kind: node_exporter, expected: light}      # GET /metrics, default port 9100
+      - {kind: kube_apiserver, expected: dark}      # TCP connect to ":6443", dark by design
+
+  - id: box
+    checks:
+      - {kind: prom_up, expected: light, path: /metrics}  # path allowlist: /metrics, /-/ready, /-/healthy
+
+  - id: lathe
+    checks:
+      - {kind: prom_up, expected: light}            # path defaults to /-/ready
+
+# Temporary announced darks. All four fields are required; an expired hold is
+# ignored and `simplex validate` warns about it. A held check still runs and
+# reports its real result, but never counts toward YELLOW or RED.
+holds:
+  - host: tower              # host slug or "*"
+    kind: ts_reach           # kind or "*"
+    reason: planned maintenance
+    until: 2026-12-01T00:00:00Z   # RFC 3339
