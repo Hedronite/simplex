@@ -1,0 +1,5 @@
+apiVersion: simplex.config/v0
+hosts:
+  - id: tower
+    checks:
+      - {kind: ts_reach, expected: light}

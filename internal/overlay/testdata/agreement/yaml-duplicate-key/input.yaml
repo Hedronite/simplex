@@ -1,0 +1,5 @@
+apiVersion: simplex.overlay/v0
+hosts:
+  tower:
+    address: "192.0.2.10"
+    address: "192.0.2.11"
