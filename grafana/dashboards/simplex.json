@@ -185,7 +185,7 @@
         "type": "prometheus",
         "uid": "lea-prom"
       },
-      "description": "Age of the served document, computed at scrape. Thresholds are multiples of the scrape interval: a wedged probe loop or a stalled serve shows as an aging document.",
+      "description": "Age of the served document, computed at scrape. The 90 s and 600 s thresholds assume the default 30 s scrape interval; scale them to yours: a wedged probe loop or a stalled serve shows as an aging document.",
       "fieldConfig": {
         "defaults": {
           "color": {

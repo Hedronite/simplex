@@ -341,8 +341,8 @@ func TestProviderFileChecksOut(t *testing.T) {
 	if p.Type != "file" {
 		t.Fatalf("provider type %q, want file", p.Type)
 	}
-	if p.Options.Path != "/var/lib/grafana/dashboards" {
-		t.Fatalf("provider path %q, want /var/lib/grafana/dashboards", p.Options.Path)
+	if p.Options.Path != "/var/lib/grafana/dashboards/simplex" {
+		t.Fatalf("provider path %q, want the dedicated /var/lib/grafana/dashboards/simplex, not the directory an existing provider already scans", p.Options.Path)
 	}
 }
 
