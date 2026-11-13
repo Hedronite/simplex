@@ -12,6 +12,7 @@
      "severity": "YELLOW", "expected": "light",
      "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
     {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []}
+     "severity": "GREEN", "expected": "light",
+     "reasons": []}
   ]
 }
