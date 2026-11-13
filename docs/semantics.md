@@ -169,7 +169,7 @@ tailscale:                   # optional, off by default (section 15)
 | `hosts[]` | yes, at least 1 | each `id` unique |
 | `hosts[].checks[]` | yes, at least 1 | `kind` and `expected` required; `port` optional; `path` only on `prom_up` |
 | `holds[]` | no | `host`, `kind`, `reason`, `until` all required |
-| `tailscale` | no | `localapi` (boolean, default false) and `socket` (an absolute path; a host:port, a URL or a relative path is a config error); see section 15 |
+| `tailscale` | no | when the block is present, `localapi` (boolean) is required; `socket` is optional (an absolute path, default the platform socket; a host:port, a URL, a relative path or a path starting `//` is a config error); see section 15 |
 
 `example.yaml` in the repo root is a config document with public slugs only. It validates against the config schema in CI.
 

@@ -899,6 +899,11 @@ func parseTailscale(n *yaml.Node, line int, errAt errFunc) Tailscale {
 	}
 	t.Line = n.Line
 	seen := map[string]bool{}
+	defer func() {
+		if !seen["localapi"] {
+			errAt("tailscale.localapi", n.Line, "required when the tailscale block is present")
+		}
+	}()
 	for i := 0; i+1 < len(n.Content); i += 2 {
 		key, val := n.Content[i], n.Content[i+1]
 		name := key.Value
