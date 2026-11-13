@@ -35,17 +35,25 @@ func (o *Options) probeSSH(ctx context.Context, inst *Instance) (contract.Result
 	defer func() { _ = conn.Close() }()
 
 	banner, err := readBanner(ctx, conn)
-	if err != nil && len(banner) == 0 {
-		// Connected, then nothing said before the budget ran out.
+	switch {
+	case len(banner) >= len(sshPrefix):
+		// The prefix is decided on the bytes the peer sent.
+		if bytes.HasPrefix(banner, sshPrefix) {
+			return contract.ResultUp, contract.ReasonTCPConnectOK, false
+		}
+		return contract.ResultDown, "", false
+	case err != nil:
+		// Fewer than four bytes arrived before the budget ended, so the
+		// prefix could not be decided either way. That is not a negative.
 		return contract.ResultUnknown, "", false
-	}
-	if bytes.HasPrefix(banner, sshPrefix) {
-		return contract.ResultUp, contract.ReasonTCPConnectOK, false
-	}
-	if len(banner) == 0 {
+	case len(banner) == 0:
+		// Connected, then closed without a word.
 		return contract.ResultUnknown, "", false
+	default:
+		// The stream ended after one to three bytes: too short to be a
+		// banner, and no more is coming.
+		return contract.ResultDown, "", false
 	}
-	return contract.ResultDown, "", false
 }
 
 // readBanner reads at most bannerLimit bytes of the banner and returns as soon

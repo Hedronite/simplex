@@ -94,6 +94,43 @@ func TestSSHBannerReads(t *testing.T) {
 			},
 		},
 		{
+			name:    "a short banner cut off by the budget is unknown",
+			result:  contract.ResultUnknown,
+			outcome: "",
+			dials:   1,
+			port: func(t *testing.T) int {
+				return startSSHPeer(t, func(conn net.Conn) {
+					// Two bytes, then nothing: the prefix cannot be decided.
+					_, _ = conn.Write([]byte("SS"))
+					<-silent
+				})
+			},
+		},
+		{
+			name:    "four differing bytes are already a negative",
+			result:  contract.ResultDown,
+			outcome: "",
+			dials:   1,
+			port: func(t *testing.T) int {
+				return startSSHPeer(t, func(conn net.Conn) {
+					_, _ = conn.Write([]byte("XSSH"))
+					<-silent
+				})
+			},
+		},
+		{
+			name:    "a short banner the peer then closes is still a negative",
+			result:  contract.ResultDown,
+			outcome: "",
+			dials:   1,
+			port: func(t *testing.T) int {
+				return startSSHPeer(t, func(conn net.Conn) {
+					// No more bytes are coming, so two bytes cannot be a prefix.
+					_, _ = conn.Write([]byte("SS"))
+				})
+			},
+		},
+		{
 			name:    "a closed port is down",
 			result:  contract.ResultDown,
 			outcome: contract.ReasonTCPConnectRefused,
