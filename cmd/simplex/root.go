@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -30,6 +31,9 @@ type Deps struct {
 	Now func() time.Time
 	// Getenv reads the environment (SIMPLEX_OVERLAY).
 	Getenv func(string) string
+	// Ready, when set, is called by serve with the bound address once the
+	// listener is up. It exists so a test can bind port 0 and learn the port.
+	Ready func(net.Addr)
 }
 
 func realDeps() *Deps {
@@ -89,7 +93,7 @@ is the CLI contract.`,
 		Args:          cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				return failure.Config("unknown command %q (try: check, validate, version)", args[0])
+				return failure.Config("unknown command %q (try: check, validate, serve, version)", args[0])
 			}
 			return cmd.Help()
 		},
@@ -100,7 +104,7 @@ is the CLI contract.`,
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		return failure.Config("%s", err.Error())
 	})
-	root.AddCommand(newCheck(deps), newValidate(deps), newVersion())
+	root.AddCommand(newCheck(deps), newValidate(deps), newServe(deps), newVersion())
 	return root
 }
 
