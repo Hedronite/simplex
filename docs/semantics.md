@@ -277,8 +277,9 @@ Three overlay situations, per command:
 
 ### version
 
-- `simplex version` prints `simplex <semver>` and exits `0` in every state.
-- `simplex version --json` prints `{"version": "...", "commit": "...", "built": "..."}` on one line.
+- `simplex version` always prints `simplex <version> (commit <sha>, built <date>)` and exits `0` in every state.
+- A build that did not stamp its metadata (a plain `go build`) uses the fallbacks `dev` for the version and `unknown` for the commit and the build date, so the line is `simplex dev (commit unknown, built unknown)`. The parenthetical is never dropped.
+- `simplex version --json` prints `{"version": "...", "commit": "...", "built": "..."}` on one line, with the same fallback values.
 
 ### Error style
 
