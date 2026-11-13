@@ -35,10 +35,22 @@ count=0
 while IFS= read -r f; do
 	[ -n "$f" ] || continue
 
-	# 1. The overlay is private user data. Only its schema may carry the name.
+	# 1. The overlay is private user data and never tracked. A tracked file fails
+	#    if its base name is simplex.overlay.yaml, ends in .overlay.yaml,
+	#    .overlay.yml or .overlay.json, or is exactly overlay.yaml, overlay.yml
+	#    or overlay.json, anywhere (testdata included); anything under .simplex/
+	#    fails too. The overlay schema is allowed by its exact path. Code and
+	#    test files may carry the word (internal/overlay); the scrub below stays
+	#    the second line of defence for overlay-shaped data under any other name.
 	base=$(basename "$f" | tr '[:upper:]' '[:lower:]')
-	case "$base" in
-	*overlay*) case "$base" in *schema*) ;; *) record "overlay appears tracked: $f" ;; esac ;;
+	case "$f" in
+	schema/simplex.overlay.v0.schema.json) ;;
+	.simplex/*|*/.simplex/*) record "overlay appears tracked: $f" ;;
+	*)
+		case "$base" in
+		simplex.overlay.yaml|*.overlay.yaml|*.overlay.yml|*.overlay.json|overlay.yaml|overlay.yml|overlay.json)
+			record "overlay appears tracked: $f" ;;
+		esac ;;
 	esac
 
 	# 2. Scrub. The pattern list mirrors docs/semantics.md section 14.
