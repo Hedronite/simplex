@@ -1,0 +1,66 @@
+# Nightly fuzzing, bounded. Nothing here has a secret and nothing runs against
+# a real host: the seeds are synthetic payloads, and the targets are pure
+# decoders.
+#
+# A crasher is NOT an issue. Go writes the minimized input into the package's
+# testdata/fuzz/<Target>/ directory; this job uploads those files as an
+# artifact and stops. A person opens the issue only after reading that input
+# and confirming the scrub passes on it (no address, hostname, token or private
+# value), because a fuzzer's minimized input is arbitrary bytes and a public
+# repository must not relay them unreviewed.
+name: fuzz
+
+on:
+  schedule:
+    # 04:17 UTC daily, off the hour so it does not pile onto other schedules.
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: FuzzLoadConfig
+            package: ./internal/config
+          - target: FuzzLoadOverlay
+            package: ./internal/overlay
+          - target: FuzzValidateRefs
+            package: ./internal/config
+          - target: FuzzDecodeStatus
+            package: ./internal/tailscale
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          check-latest: true
+      - name: fuzz for two minutes
+        # Two minutes per target, four targets in parallel: the schedule is
+        # bounded well inside ten minutes of work.
+        run: go test -run '^$' -fuzz "^${{ matrix.target }}$" -fuzztime 2m ${{ matrix.package }}
+      - name: collect a crasher
+        if: failure()
+        run: |
+          set -euo pipefail
+          {
+            echo "### ${{ matrix.target }} found a crasher"
+            echo
+            echo 'The minimized input is in the artifact. Do not open an issue from it'
+            echo 'until the input has been read and the public-tree scrub passes on it.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          find . -path '*/testdata/fuzz/*' -type f -newer go.mod -print | head -20
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: crasher-${{ matrix.target }}
+          path: '**/testdata/fuzz/**'
+          if-no-files-found: ignore
+          retention-days: 30
