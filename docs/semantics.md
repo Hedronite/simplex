@@ -51,7 +51,7 @@ Classification and severity are separate layers, in this order and no other:
 
 ## 4. Reason codes
 
-Closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. `watchdog_only` and `peer_prometheus_*` are not Simplex codes.
+Closed, snake_case, frozen at S0. Add a code is a minor change; remove or rename is breaking. `watchdog_only` and `peer_prometheus_*` are never emitted and are not a Simplex reason: alert state belongs to Augur.
 
 Each probed check carries exactly one **outcome** code, plus zero or one **verdict** code. The only check with no outcome code is one invalidated by a blind vantage, which carries `vantage_blind` alone. `reasons[]` is sorted bytewise ascending.
 
