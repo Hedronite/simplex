@@ -252,6 +252,8 @@ func (o *Options) attempt(ctx context.Context, inst *Instance) (Observation, boo
 		obs.Result, obs.Outcome, timedOut = o.probeTCP(ctx, inst)
 	case contract.KindNodeExporter, contract.KindPromUp:
 		obs.Result, obs.Outcome, timedOut = o.probeHTTP(ctx, inst)
+	case contract.KindSSH:
+		obs.Result, obs.Outcome, timedOut = o.probeSSH(ctx, inst)
 	default:
 		// A kind this slice does not implement yet: no guess is better than a
 		// wrong verdict.

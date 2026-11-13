@@ -164,7 +164,7 @@ holds:
 
 `example.yaml` in the repo root is a config document with public slugs only. It validates against the config schema in CI.
 
-Overlay (`simplex.overlay/v0`): public shape, private values, never tracked (`simplex.overlay.yaml`, `*.overlay.yaml`). Path from `--overlay` or `SIMPLEX_OVERLAY`. Keyed by host slug.
+Overlay (`simplex.overlay/v0`): public shape, private values, never tracked (`simplex.overlay.yaml`, `*.overlay.yaml`, `*.overlay.yml`, `*.overlay.json`, or a file named exactly `overlay.yaml`, `overlay.yml` or `overlay.json`; see section 14). Path from `--overlay` or `SIMPLEX_OVERLAY`. Keyed by host slug.
 
 ```yaml
 apiVersion: simplex.overlay/v0
@@ -302,4 +302,4 @@ Every tracked text file is scanned in CI. The allowlist is exact; anything else 
 - The three TEST-NET blocks of RFC 5737 are warnings, allowed only in docs and fixtures as placeholders.
 - Everything else fails: other IPv4 and IPv6 literals, `*.ts.net` and `*.tailnet` names, `*.local`, `*.lan`, private keys, GitHub, cloud and Slack tokens, JWTs, bearer tokens, and `/Users/...` or `/home/...` paths.
 - Emails must end in `example.com`, `example.org` or `users.noreply.github.com`.
-- No tracked file whose base name contains `overlay`, except the overlay schema.
+- A tracked file fails if its base name is `simplex.overlay.yaml`, ends in `.overlay.yaml`, `.overlay.yml` or `.overlay.json`, or is exactly `overlay.yaml`, `overlay.yml` or `overlay.json`, anywhere in the tree (test data included). Anything under `.simplex/` fails too. The overlay schema is allowed by its exact path. Code, tests and packages may use the word (`internal/overlay`); fixtures and fuzz seeds that carry overlay-shaped data use other names, such as `private.yaml` or `seed-*`. The address and hostname scrub above is unchanged and stays the second line of defence for overlay-shaped data under any name.
