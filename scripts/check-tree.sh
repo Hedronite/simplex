@@ -3,40 +3,53 @@
 # hostname or secret reaches a public file. The allowlist is exactly the one
 # frozen in docs/semantics.md section 14.
 #
-# Findings are collected in a file rather than a variable, so a finding raised
-# inside a pipeline still fails the run.
+# Two implementation rules, both learned the hard way:
+#  - Findings are collected in a file, not a variable, so a finding raised
+#    inside a pipeline still fails the run.
+#  - The file list is read line by line with IFS=, not word-split, so a tracked
+#    path containing a space is scanned as one path. A path containing a
+#    newline is not representable in this list; the parser refuses one below.
 set -eu
 
 cd "$(dirname "$0")/.."
 
+list=$(mktemp)
 findings=$(mktemp)
-trap 'rm -f "$findings"' EXIT
+trap 'rm -f "$list" "$findings"' EXIT
 
 record() { printf '%s\n' "$*" >>"$findings"; }
 
-files=$(git ls-files)
+git ls-files >"$list"
+
+# A newline in a tracked path would be read as two paths, and the gate would
+# silently scan a partial name. Count both separators and compare: one newline
+# per path means no name contains one.
+n_nul=$(git ls-files -z | tr -cd '\0' | wc -c | tr -d ' ')
+n_line=$(wc -l <"$list" | tr -d ' ')
+if [ "$n_nul" -ne "$n_line" ]; then
+	record "a tracked path contains a newline; the gate cannot scan it safely"
+fi
+
 count=0
 
-# 1. The overlay is private user data. Only its schema may carry the name.
-for f in $files; do
+while IFS= read -r f; do
+	[ -n "$f" ] || continue
+
+	# 1. The overlay is private user data. Only its schema may carry the name.
 	base=$(basename "$f" | tr '[:upper:]' '[:lower:]')
 	case "$base" in
 	*overlay*) case "$base" in *schema*) ;; *) record "overlay appears tracked: $f" ;; esac ;;
 	esac
-done
 
-# 2. Scrub. The pattern list mirrors docs/semantics.md section 14.
-#    Allowed address literals: 127.0.0.0/8, 0.0.0.0, 255.255.255.255, 100.64.0.0/10.
-#    TEST-NET is a warning, not a failure.
-ipv4='([0-9]{1,3}\.){3}[0-9]{1,3}'
-for f in $files; do
-	# Skip binary files: grep -I reports them, so probe each file first.
+	# 2. Scrub. The pattern list mirrors docs/semantics.md section 14.
+	#    Allowed address literals: 127.0.0.0/8, 0.0.0.0, 255.255.255.255,
+	#    100.64.0.0/10. TEST-NET is a warning, not a failure.
 	if ! grep -Iq . "$f" 2>/dev/null; then
 		continue
 	fi
 	count=$((count + 1))
 
-	grep -nEo "$ipv4(/([0-9]|[12][0-9]|3[0-2]))?" "$f" 2>/dev/null |
+	grep -nEo '([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]|[12][0-9]|3[0-2]))?' "$f" 2>/dev/null |
 		while IFS=: read -r line match; do
 			case "$match" in
 			100.64.0.0/10|127.0.0.1/32|0.0.0.0/0) continue ;;
@@ -89,7 +102,7 @@ for f in $files; do
 			esac
 			record "$f:$line: email $addr"
 		done
-done
+done <"$list"
 
 if [ -s "$findings" ]; then
 	sed 's/^/FAIL /' "$findings"
