@@ -1,23 +1,27 @@
 # Pins move by reviewed pull requests, never silently. Actions are pinned to
-# commit SHAs (scripts/check-tree.sh fails on anything else) and Dependabot
-# updates the SHA and its version comment together. Go modules follow the same
-# cadence. Dependabot commits carry no Signed-off-by, so a maintainer rebuilds
-# each one as a signed commit before it merges.
+# commit SHAs (scripts/check-tree.sh fails on anything else), and Dependabot
+# proposes the new SHA with its version comment, monthly, one grouped pull
+# request per ecosystem.
+#
+# A Dependabot pull request is a proposal only: its commits carry no
+# Signed-off-by, so under the DCO rule it is never merged as is. A maintainer
+# re-applies the change as a signed commit on a new branch, opens that pull
+# request, and closes the Dependabot one.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
+      interval: monthly
+    open-pull-requests-limit: 1
     groups:
       actions:
         patterns: ["*"]
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
+      interval: monthly
+    open-pull-requests-limit: 1
     groups:
       go-modules:
         patterns: ["*"]
