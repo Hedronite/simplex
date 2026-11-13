@@ -9,4 +9,4 @@ holds:
   - host: tower
     kind: ts_reach
     reason: planned maintenance
-    until: 2027-01-01T00:00:00Z
+    until: "2027-01-01T00:00:00Z"

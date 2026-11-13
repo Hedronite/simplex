@@ -174,8 +174,11 @@ func TestValidDocuments(t *testing.T) {
 	seen := 0
 	for _, entry := range entries {
 		kind := strings.SplitN(entry.Name(), ".", 2)[0]
+		if kind == "private" {
+			kind = "overlay"
+		}
 		if _, ok := schemaFiles[kind]; !ok {
-			t.Fatalf("%s: file name must start with probe, config or overlay", entry.Name())
+			t.Fatalf("%s: file name must start with probe, config or private", entry.Name())
 		}
 		seen++
 		t.Run(entry.Name(), func(t *testing.T) {
@@ -190,38 +193,6 @@ func TestValidDocuments(t *testing.T) {
 	}
 }
 
-// TestNegativeDocuments asserts that every file under testdata/negative is
-// rejected by the schema its name prefix selects. One forbidden thing per
-// file, so a rejection names the rule that fired.
-func TestNegativeDocuments(t *testing.T) {
-	dir := filepath.Join("testdata", "negative")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read %s: %v", dir, err)
-	}
-	seen := 0
-	for _, entry := range entries {
-		parts := strings.SplitN(strings.TrimSuffix(entry.Name(), ".json"), "__", 2)
-		if len(parts) != 2 {
-			t.Fatalf("%s: name must be <kind>__<case>.json", entry.Name())
-		}
-		kind := parts[0]
-		if _, ok := schemaFiles[kind]; !ok {
-			t.Fatalf("%s: unknown schema prefix %q", entry.Name(), kind)
-		}
-		seen++
-		t.Run(entry.Name(), func(t *testing.T) {
-			doc := readJSONFile(t, filepath.Join(dir, entry.Name()))
-			if err := compileSchema(t, kind).Validate(doc); err == nil {
-				t.Fatalf("invalid document accepted by the %s schema", kind)
-			}
-		})
-	}
-	if seen == 0 {
-		t.Fatal("testdata/negative holds no documents")
-	}
-}
-
 func readJSONFile(t *testing.T, path string) any {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -233,6 +204,910 @@ func readJSONFile(t *testing.T, path string) any {
 		t.Fatalf("%s: not JSON: %v", path, err)
 	}
 	return doc
+}
+
+// negativeCases is the schema-rejection corpus. The documents live in Go
+// rather than on disk because every tracked simplex document in the tree is
+// a golden fixture by definition, and these are deliberately invalid: they
+// are the one place where a malformed document is the point.
+var negativeCases = []struct {
+	kind string
+	name string
+	doc  string
+}{
+	{"config", "canary_of_wrong_kind", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "prom_up",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "check_missing_expected", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        },
+        {
+          "kind": "ts_reach"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "denylisted_port", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        },
+        {
+          "kind": "ts_reach",
+          "expected": "light",
+          "port": 18080
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "empty_hosts", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "hold_without_reason", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "hold_without_until", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance"
+    }
+  ]
+}`},
+	{"config", "host_without_id", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    },
+    {
+      "checks": []
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "missing_vantage", `{
+  "apiVersion": "simplex.config/v0",
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "path_outside_allowlist", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/admin"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"config", "unknown_key", `{
+  "apiVersion": "simplex.config/v0",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ],
+  "hostz": []
+}`},
+	{"config", "unknown_major", `{
+  "apiVersion": "simplex.config/v9",
+  "vantage": {
+    "id": "lathe",
+    "canaries": [
+      {
+        "host": "tower",
+        "kind": "ts_reach",
+        "target": ":9100"
+      }
+    ]
+  },
+  "hosts": [
+    {
+      "id": "tower",
+      "checks": [
+        {
+          "kind": "ts_reach",
+          "expected": "light"
+        },
+        {
+          "kind": "kube_apiserver",
+          "expected": "dark"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "checks": [
+        {
+          "kind": "prom_up",
+          "expected": "light",
+          "path": "/metrics"
+        }
+      ]
+    },
+    {
+      "id": "spare"
+    }
+  ],
+  "holds": [
+    {
+      "host": "*",
+      "kind": "ssh",
+      "reason": "planned maintenance",
+      "until": "2026-11-20T00:00:00Z"
+    }
+  ]
+}`},
+	{"probe", "check_missing_expected", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "duplicate_reason", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded",
+        "unexpected_dark",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "host_without_reasons", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW"
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "missing_api_version", `{
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "target_with_address", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": "box:9090",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "timestamp_with_offset", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00-05:00",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "unknown_key", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "surprise": 1
+}`},
+	{"probe", "unknown_kind", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "ping",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "unknown_reason", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded",
+        "watchdog_only"
+      ]
+    }
+  ]
+}`},
+	{"probe", "unknown_vantage_status", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "down"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+	{"probe", "wrong_major", `{
+  "apiVersion": "simplex.probe/v1",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "vantage": {
+    "id": "lathe",
+    "status": "ok"
+  },
+  "overall": "YELLOW",
+  "hosts": [
+    {
+      "id": "box",
+      "severity": "YELLOW",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "host": "box",
+      "kind": "prom_up",
+      "target": ":9090/-/ready",
+      "result": "down",
+      "severity": "YELLOW",
+      "expected": "light",
+      "reasons": [
+        "http_unexpected_status",
+        "prom_pair_degraded"
+      ]
+    }
+  ]
+}`},
+}
+
+// TestNegativeDocuments asserts that each corpus document is rejected by the
+// schema its kind selects. One forbidden thing per case, so a rejection names
+// the rule that fired.
+func TestNegativeDocuments(t *testing.T) {
+	if len(negativeCases) == 0 {
+		t.Fatal("no negative cases")
+	}
+	for _, tc := range negativeCases {
+		t.Run(tc.kind+"/"+tc.name, func(t *testing.T) {
+			doc, err := jsonschema.UnmarshalJSON(strings.NewReader(tc.doc))
+			if err != nil {
+				t.Fatalf("case document is not JSON: %v", err)
+			}
+			if err := compileSchema(t, tc.kind).Validate(doc); err == nil {
+				t.Fatalf("invalid document accepted by the %s schema", tc.kind)
+			}
+		})
+	}
 }
 
 // TestProbeDocumentAllowsEmptyReasonArrays pins that a healthy check and a

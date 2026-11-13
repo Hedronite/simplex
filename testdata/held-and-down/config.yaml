@@ -9,4 +9,4 @@ holds:
   - host: box
     kind: node_exporter
     reason: exporter migration
-    until: 2027-01-01T00:00:00Z
+    until: "2027-01-01T00:00:00Z"
