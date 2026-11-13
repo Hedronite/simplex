@@ -179,6 +179,15 @@ substitutions() {
 		-e 's/\${\?kind}\?/.*/g'
 }
 
+# query_value returns the first sample's value for one expression.
+query_value() {
+	local expr encoded
+	expr=$1
+	encoded=$(jq -rn --arg q "$expr" '$q | @uri')
+	curl -fsS "http://127.0.0.1:$PROM_PORT/api/v1/query?query=$encoded&time=$(date +%s)" |
+		jq -er 'if .status == "success" then (.data.result[0].value[1] // "0") else error(.error // "query failed") end'
+}
+
 # query_len returns the number of series one expression selects at this instant.
 query_len() {
 	local expr encoded
@@ -188,18 +197,21 @@ query_len() {
 		jq -er 'if .status == "success" then (.data.result | length) else error(.error // "query failed") end'
 }
 
-note "waiting for the first scrape to land"
+note "waiting for two scrapes, so increase() has a window to work with"
+samples=0
 for _ in $(seq 1 30); do
-	if [ "$(query_len 'simplex_build_info')" != "0" ]; then
+	samples=$(query_value 'count_over_time(simplex_build_info[1m])' 2>/dev/null || echo 0)
+	# count_over_time yields a float; compare as an integer.
+	if [ "${samples%%.*}" -ge 2 ] 2>/dev/null; then
 		break
 	fi
 	sleep 1
 done
-if [ "$(query_len 'simplex_build_info')" = "0" ]; then
+if ! [ "${samples%%.*}" -ge 2 ] 2>/dev/null; then
 	note "Prometheus targets, for the failure record"
 	curl -fsS "http://127.0.0.1:$PROM_PORT/api/v1/targets" |
 		jq -r '.data.activeTargets[] | "\(.scrapeUrl) health=\(.health) error=\(.lastError // "-")"' >&2 || true
-	fail "Prometheus never scraped the exposition"
+	fail "Prometheus has $samples sample(s) of the exposition; the queries need two"
 fi
 
 note "each expression returns what the fixture implies"
