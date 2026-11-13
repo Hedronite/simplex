@@ -487,3 +487,38 @@ func TestServeNeverExitsOnSeverity(t *testing.T) {
 	}
 	sv.stop(t)
 }
+
+// A stop that arrives after serve has logged "listening" but before the server
+// goroutine has started Serve: Shutdown finds no listener to close, and Serve
+// closes it later, on its own schedule. serve must not return until the port is
+// free, so rebinding the same address right after it returns has to work.
+func TestServeStopBeforeServeStartsReleasesThePort(t *testing.T) {
+	cfg, ov := serveFiles(t, sentinelAddr)
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := probe.Addr().String()
+	_ = probe.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	deps := serveDeps(sentinelAddr, contract.ReasonTCPConnectOK)
+	deps.Now = time.Now
+	// Hold Serve back: stop the run, then give serve time to reach and finish
+	// Shutdown before Serve is allowed to start.
+	deps.beforeServe = func() {
+		cancel()
+		time.Sleep(300 * time.Millisecond)
+	}
+	errb := &syncBuffer{}
+	code := run(ctx, []string{"serve", "--config", cfg, "--overlay", ov, "--listen", addr, "--interval", "1m", "--deadline", "50s"}, io.Discard, errb, deps)
+	if code != exitcode.Green {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("the address is still held after serve returned: %v", err)
+	}
+	_ = ln.Close()
+}

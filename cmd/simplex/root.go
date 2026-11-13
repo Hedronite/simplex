@@ -35,6 +35,12 @@ type Deps struct {
 	// A test uses it to point enrichment at a fake daemon; the shipped binary
 	// never sets it.
 	TailscaleSocket string
+
+	// beforeServe is a test-only hook: when set, serve calls it in the server
+	// goroutine just before Serve starts, so a test can hold Serve back and force a
+	// stop into the window between listening and serving. Nothing outside this
+	// package can set it, and the shipped binary never does.
+	beforeServe func()
 	// Ready, when set, is called by serve with the bound address once the
 	// listener is up. It exists so a test can bind port 0 and learn the port.
 	Ready func(net.Addr)
