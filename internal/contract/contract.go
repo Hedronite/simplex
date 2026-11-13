@@ -14,6 +14,17 @@ const (
 // Wildcard matches any host slug or any kind in a hold.
 const Wildcard = "*"
 
+// The only paths an HTTP check may request. The config and the overlay both
+// take them from this allowlist, and the probe schema pins the same three.
+const (
+	PathMetrics = "/metrics"
+	PathReady   = "/-/ready"
+	PathHealthy = "/-/healthy"
+)
+
+// AllowedPaths lists every path an HTTP check may name, in documentation order.
+var AllowedPaths = []string{PathMetrics, PathReady, PathHealthy}
+
 // DeniedPort is never dialed, at config load or in the dialer.
 const DeniedPort = 18080
 

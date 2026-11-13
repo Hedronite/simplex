@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hedronite/simplex/schema/simplex.overlay.v0.schema.json",
+  "title": "simplex.overlay/v0",
+  "description": "Private address overlay. Never tracked in git. Public shape, private values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "hosts"],
+  "properties": {
+    "apiVersion": {
+      "const": "simplex.overlay/v0"
+    },
+    "hosts": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+      },
+      "description": "Keyed by host slug; the slug must exist in the config.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address"],
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lan_address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "overrides": {
+            "type": "array",
+            "description": "Per (kind, target) overrides. The override wins over the config, and the document target shows the effective form.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "enum": ["ts_reach", "lan_reach", "node_exporter", "prom_up", "kube_apiserver", "ssh"]
+                },
+                "target": {
+                  "type": "string",
+                  "pattern": "^:[0-9]{1,5}(/[!-~]*)?$"
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "not": {"const": 18080}
+                },
+                "path": {
+                  "enum": ["/metrics", "/-/ready", "/-/healthy"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
