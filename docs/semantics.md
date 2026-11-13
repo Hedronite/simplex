@@ -148,7 +148,7 @@ holds:
   - host: tower              # slug or "*"
     kind: ts_reach           # kind or "*"
     reason: planned reboot   # required, scrubbed in CI
-    until: 2026-11-20T00:00:00Z  # RFC 3339, required
+    until: "2026-11-20T00:00:00Z"  # RFC 3339 string, required; quote it
 ```
 
 | Field | Required | Rule |
