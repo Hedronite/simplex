@@ -49,14 +49,24 @@ archives:
       - tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    # Every file carries the commit date as its mtime. Without this the
+    # archive inherits the checkout's timestamps, which differ between runners,
+    # and two builds of one commit stop being byte-identical.
     files:
-      - LICENSE
-      - README.md
-      - CONTRIBUTING.md
-      - SECURITY.md
-      - example.yaml
-      - grafana/dashboards/simplex.json
-      - grafana/provisioning/dashboards/simplex.yaml
+      - src: LICENSE
+        info: {mtime: '{{ .CommitDate }}'}
+      - src: README.md
+        info: {mtime: '{{ .CommitDate }}'}
+      - src: CONTRIBUTING.md
+        info: {mtime: '{{ .CommitDate }}'}
+      - src: SECURITY.md
+        info: {mtime: '{{ .CommitDate }}'}
+      - src: example.yaml
+        info: {mtime: '{{ .CommitDate }}'}
+      - src: grafana/dashboards/simplex.json
+        info: {mtime: '{{ .CommitDate }}'}
+      - src: grafana/provisioning/dashboards/simplex.yaml
+        info: {mtime: '{{ .CommitDate }}'}
 
 checksum:
   name_template: checksums.txt

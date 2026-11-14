@@ -42,9 +42,10 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.x'
+          go-version-file: go.mod
           check-latest: true
-      - uses: anchore/sbom-action/download-syft@fffec3d851af758d56fee099cf3fbf8aa8779843 # v0.24.3
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
       - name: snapshot build
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
@@ -76,13 +77,14 @@ jobs:
           ./scripts/release-check.sh check dist
 
           # A throwaway key proves the signing and verification path without a
-          # real identity: no Fulcio, no transparency-log entry.
+          # real identity: no Fulcio, no transparency-log entry. cosign v3 signs
+          # into a bundle; the separate signature and certificate flags are gone.
           cosign generate-key-pair
           cosign sign-blob --yes --key cosign.key \
-            --output-signature dist/checksums.txt.sig \
+            --bundle dist/checksums.txt.sigstore.json \
             dist/checksums.txt
           cosign verify-blob --key cosign.pub \
-            --signature dist/checksums.txt.sig \
+            --bundle dist/checksums.txt.sigstore.json \
             dist/checksums.txt
           echo "== throwaway-key signature verifies against dist/checksums.txt"
           rm -f cosign.key && echo "the throwaway private key is gone"
@@ -95,6 +97,10 @@ jobs:
   reproducible:
     name: compare the two images
     needs: build
+    # Run even when a build leg failed: a skipped comparison is how a
+    # reproducibility break hid once already. If the artifacts are not both
+    # there, the job fails and says so.
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -106,12 +112,14 @@ jobs:
       - name: compare
         run: |
           set -euo pipefail
-          first=$(find artifacts -name 'checksums-*' | head -n 1)
-          second=$(find artifacts -name 'checksums-*' | tail -n 1)
-          if [ "$first" = "$second" ]; then
-            echo "only one runner reported; the comparison needs two" >&2
+          count=$(find artifacts -name 'checksums-*' -type f | wc -l | tr -d ' ')
+          if [ "$count" -lt 2 ]; then
+            echo "only $count checksums file(s) arrived; both builds must succeed before this can compare" >&2
+            find artifacts -type f >&2 || true
             exit 1
           fi
+          first=$(find artifacts -name 'checksums-*' -type f | sort | head -n 1)
+          second=$(find artifacts -name 'checksums-*' -type f | sort | tail -n 1)
           if ! diff -u "$first" "$second"; then
             echo "the two runner images produced different checksums; the build is not reproducible" >&2
             exit 1
