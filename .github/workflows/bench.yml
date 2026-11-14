@@ -39,16 +39,19 @@ jobs:
             echo "the merge base has no internal/perf; reporting the head only" | tee bench-base.txt
             exit 0
           fi
-          ( cd ../base && go test -run '^$' -bench . -benchmem -count 6 ./internal/perf/ ) > bench-base.txt
+          ( cd ../base && go test -run '^$' -bench . -benchmem -count 5 -benchtime 40x ./internal/perf/ ) > bench-base.txt
       - name: benchmark the head
-        run: go test -run '^$' -bench . -benchmem -count 6 ./internal/perf/ > bench-head.txt
+        # Five samples per benchmark, forty iterations each: enough for
+        # benchstat to judge a difference, small enough that the whole job
+        # stays well inside its cap even with the 1,000-check passes.
+        run: go test -run '^$' -bench . -benchmem -count 5 -benchtime 40x ./internal/perf/ > bench-head.txt
       - name: compare
         run: |
           set -euo pipefail
           {
             echo '### benchmarks'
             echo
-            echo '`internal/perf`, six runs each. Report only: time budgets are not gated on shared runners.'
+            echo '`internal/perf`, five runs of forty iterations each. Report only: time budgets are not gated on shared runners.'
             echo
             echo '```'
             if grep -q '^goos:' bench-base.txt; then
