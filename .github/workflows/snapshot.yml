@@ -118,11 +118,10 @@ jobs:
             find artifacts -type f >&2 || true
             exit 1
           fi
-          first=$(find artifacts -name 'checksums-*' -type f | sort | head -n 1)
-          second=$(find artifacts -name 'checksums-*' -type f | sort | tail -n 1)
-          if ! diff -u "$first" "$second"; then
-            echo "the two runner images produced different checksums; the build is not reproducible" >&2
-            exit 1
-          fi
-          echo "== checksums identical across $first and $second"
-          cat "$first"
+          # Stage each checksums file under the name the checker expects, then
+          # use the same comparison the local run uses: archive checksums only,
+          # because syft stamps SBOMs with a generation time and a UUID.
+          mkdir -p a b
+          cp "$(find artifacts -name 'checksums-*' -type f | sort | head -n 1)" a/checksums.txt
+          cp "$(find artifacts -name 'checksums-*' -type f | sort | tail -n 1)" b/checksums.txt
+          ./scripts/release-check.sh compare a b
