@@ -8,8 +8,9 @@ normal deployment decision.
 
 ## What it needs
 
-- Grafana 13.x (the JSON carries `schemaVersion` 42; Grafana migrates older
-  numbers up on import).
+- Grafana 13.x (the JSON carries `schemaVersion` 42, and Grafana migrates
+  older numbers up on import; the import smoke that would pin an exact
+  version is a separate slice).
 - A Prometheus datasource in your Grafana that scrapes `simplex serve`. The
   dashboard asks which one to use: a selector at the top of the page,
   defaulting to the instance default datasource. Pick the one that scrapes

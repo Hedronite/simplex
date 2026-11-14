@@ -36,6 +36,7 @@ and the release tooling.
 - A release pipeline: reproducible archives and binaries, a per-archive
   CycloneDX SBOM, a cosign keyless signature bundle over the checksums file,
   pinned workflow actions, and benchmarks, profiles and a soak pass in CI.
+
 ### Security
 
 - Inspect-only by design: probes send no credentials, never mutate a host,

@@ -45,7 +45,6 @@ Rulings baked into this table:
   `ts_peer_online`, `ts_peer_offline`, `ts_peer_unmatched`, `ts_path_direct`
   and `ts_path_relayed`. Enrichment is informational: it never moves a
   severity, so these series explain and never alert.
-  an unknown code can never become a label.
 - `simplex_check_reason` is driven by the frozen enum even if a document
   carried a code the contract does not know: the label space cannot grow past
   the 21 codes.
