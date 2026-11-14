@@ -1,0 +1,76 @@
+# Benchmarks are a report, not a gate. Shared runners are too noisy to gate on
+# time, so this job posts the comparison and never fails on a slowdown; the
+# deterministic gates (allocations per check, soak flatness) live in the test
+# suite instead.
+name: bench
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    name: benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          check-latest: true
+      - name: benchmark the merge base
+        run: |
+          set -euo pipefail
+          base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          git worktree add --detach ../base "$base"
+          # A base that predates these benchmarks has nothing to compare
+          # against: report the head alone rather than failing the PR.
+          if [ ! -d ../base/internal/perf ]; then
+            echo "the merge base has no internal/perf; reporting the head only" | tee bench-base.txt
+            exit 0
+          fi
+          ( cd ../base && go test -run '^$' -bench . -benchmem -count 5 -benchtime 40x ./internal/perf/ ) > bench-base.txt
+      - name: benchmark the head
+        # Five samples per benchmark, forty iterations each: enough for
+        # benchstat to judge a difference, small enough that the whole job
+        # stays well inside its cap even with the 1,000-check passes.
+        run: go test -run '^$' -bench . -benchmem -count 5 -benchtime 40x ./internal/perf/ > bench-head.txt
+      - name: compare
+        run: |
+          set -euo pipefail
+          {
+            echo '### benchmarks'
+            echo
+            echo '`internal/perf`, five runs of forty iterations each. Report only: time budgets are not gated on shared runners.'
+            echo
+            echo '```'
+            if grep -q '^goos:' bench-base.txt; then
+              go run golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e bench-base.txt bench-head.txt
+            else
+              echo 'no baseline: the merge base predates internal/perf'
+              cat bench-head.txt
+            fi
+            echo '```'
+          } > bench-comment.md
+          cat bench-comment.md >> "$GITHUB_STEP_SUMMARY"
+      - name: post the comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fork pull requests get a read-only token; the step summary above
+          # still carries the numbers, so a failed comment is not a failure.
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file bench-comment.md ||
+            echo "could not comment (read-only token); see the job summary"
+      - name: keep the raw output
+        if: always()
+        run: cat bench-base.txt bench-head.txt 2>/dev/null || true
