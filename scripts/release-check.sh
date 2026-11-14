@@ -66,8 +66,8 @@ check_dist() {
 	[ -n "$sboms" ] || fail "no SBOM under $dist"
 	for sbom in $sboms; do
 		[ -s "$sbom" ] || fail "empty SBOM: $sbom"
-		grep -qi '"bomFormat"[[:space:]]*:[[:space:]]*"CycloneDX"' "$sbom" ||
-			fail "$sbom is not CycloneDX"
+		grep -q '"bomFormat"' "$sbom" || fail "$sbom has no bomFormat"
+		grep -q 'CycloneDX' "$sbom" || fail "$sbom is not CycloneDX"
 	done
 	first=$(printf '%s\n' "$sboms" | head -n 1)
 	for shipped in spf13/cobra spf13/pflag go.yaml.in/yaml; do

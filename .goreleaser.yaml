@@ -67,6 +67,10 @@ checksum:
 sboms:
   - id: archive
     artifacts: archive
+    # syft's own output format is not CycloneDX; naming it here keeps the file
+    # extension and the content in agreement.
+    cmd: syft
+    args: ['$artifact', '--output', 'cyclonedx-json']
     documents:
       - '${artifact}.sbom.cdx.json'
 
