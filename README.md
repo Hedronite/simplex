@@ -112,12 +112,21 @@ cosign verify-blob \
   --certificate-identity https://github.com/Hedronite/simplex/.github/workflows/release.yml@refs/tags/v0.1.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
-sha256sum --check checksums.txt
+sha256sum --check --ignore-missing checksums.txt
 ```
 
 `checksums.txt` carries one sha256 line per artifact, and the signature is a
 cosign keyless bundle (`checksums.txt.sigstore.json`) — there is no separate
-`.sig` or `.pem` file. Each archive also ships an SBOM beside it:
+`.sig` or `.pem` file. Only the files present on disk are checked: the
+checksums file lists every shipped artifact, so a single-archive download
+checks its own line and that line must print OK. On macOS, where
+`sha256sum` is not part of the base system, the same check is:
+
+```sh
+shasum -a 256 --check --ignore-missing checksums.txt
+```
+
+Each archive also ships an SBOM beside it:
 `<archive name>.sbom.cdx.json`, CycloneDX JSON, listing the modules that ship
 in the binary.
 
