@@ -4,8 +4,12 @@
 # What it proves, in the order it proves it:
 #
 #   1. Grafana, pinned by digest, provisions the provider file and the dashboard
-#      from files, and serves the dashboard under its frozen uid with every
-#      panel using the datasource uid the repo fixes.
+#      from files, and serves the dashboard under its frozen uid. The dashboard
+#      names no datasource uid: every reference is the template variable, the
+#      variable is a Prometheus picker that starts on the instance default, and
+#      the instance default is the datasource this job provisions under a uid
+#      it invents. The provisioned datasource is also queried through Grafana
+#      once, so the path the variable resolves to is shown to work.
 #   2. Prometheus, pinned by digest, scrapes a static exposition built from a
 #      fixture's golden, and every panel expression returns data from it.
 #   3. The vantage selectors discriminate: a status the fixture does not have
@@ -29,7 +33,10 @@ PROMETHEUS_IMAGE=${PROMETHEUS_IMAGE:-"prom/prometheus@sha256:86b17a25c2db1d16a61
 DASHBOARD=grafana/dashboards/simplex.json
 PROVIDER=grafana/provisioning/dashboards/simplex.yaml
 DASHBOARD_UID=simplex
-PROM_UID=lea-prom
+# A uid this job invents. The dashboard carries none, which is the property
+# under test: an import works on a Grafana whose datasource has any uid.
+PROM_UID=smoke-prom
+GRAFANA_AUTH="admin:throwaway-ci-only"
 GRAFANA_PORT=3000
 PROM_PORT=9090
 EXPO_PORT=9109
@@ -131,7 +138,7 @@ cp "$DASHBOARD" "$WORK/rootfs$DASH_DIR/"
 cat >"$WORK/provisioning/datasources/simplex.yaml" <<YAML
 apiVersion: 1
 datasources:
-  - name: Prometheus (lea-lathe)
+  - name: Prometheus (smoke)
     uid: $PROM_UID
     type: prometheus
     access: proxy
@@ -165,7 +172,7 @@ fi
 # setting had been lost.
 
 note "the dashboard is served under its frozen uid, from the provider path $DASH_DIR"
-curl -fsS -u "admin:throwaway-ci-only" \
+curl -fsS -u "$GRAFANA_AUTH" \
 	"http://127.0.0.1:$GRAFANA_PORT/api/dashboards/uid/$DASHBOARD_UID" >"$WORK/served-dashboard.json" ||
 	fail "GET /api/dashboards/uid/$DASHBOARD_UID failed"
 
@@ -178,12 +185,27 @@ served_panels=$(jq '.dashboard.panels | length' "$WORK/served-dashboard.json")
 file_panels=$(jq '.panels | length' "$DASHBOARD")
 [ "$served_panels" = "$file_panels" ] || fail "served $served_panels panels, the file has $file_panels"
 
-note "every served panel uses the datasource uid the repo fixes"
-bad_ds=$(jq -r --arg want "$PROM_UID" '
+note "no datasource uid is written into the served dashboard: every reference is the template variable"
+bad_ds=$(jq -r '
 	[.. | objects | select(has("datasource")) | .datasource
 	 | (if type == "object" then (.uid // "missing") else "string:" + tostring end)]
-	| map(select(. != $want)) | unique | .[]' "$WORK/served-dashboard.json")
-[ -z "$bad_ds" ] || fail "panels use datasources other than $PROM_UID: $bad_ds"
+	| map(select(. != "${datasource}")) | unique | .[]' "$WORK/served-dashboard.json")
+[ -z "$bad_ds" ] || fail "the dashboard names datasources other than the variable: $bad_ds"
+
+note "the datasource variable is a Prometheus picker that starts on the instance default"
+jq -e '.dashboard.templating.list[]
+	| select(.name == "datasource")
+	| (.type == "datasource" and .query == "prometheus" and .current.value == "default"
+	   and (.multi // false) == false and (.includeAll // false) == false)' \
+	"$WORK/served-dashboard.json" >/dev/null ||
+	fail "the served dashboard has no single-select Prometheus datasource variable on default"
+
+note "the instance default the variable resolves to is the Prometheus this job provisioned"
+default_uid=$(curl -fsS -u "$GRAFANA_AUTH" "http://127.0.0.1:$GRAFANA_PORT/api/datasources" |
+	jq -r '[.[] | select(.type == "prometheus" and .isDefault == true)]
+		| if length == 1 then .[0].uid else "none-or-several" end')
+[ "$default_uid" = "$PROM_UID" ] ||
+	fail "the Prometheus default datasource is \"$default_uid\", want $PROM_UID"
 
 note "served panel titles match the file"
 served_titles=$(jq -r '[.dashboard.panels[].title] | sort | join("|")' "$WORK/served-dashboard.json")
@@ -233,6 +255,18 @@ if ! [ "${samples%%.*}" -ge 2 ] 2>/dev/null; then
 		jq -r '.data.activeTargets[] | "\(.scrapeUrl) health=\(.health) error=\(.lastError // "-")"' >&2 || true
 	fail "Prometheus has $samples sample(s) of the exposition; the queries need two"
 fi
+
+note "the provisioned datasource answers through Grafana, by the uid the variable resolved to"
+grafana_reply=$(curl -fsS -u "$GRAFANA_AUTH" -H 'Content-Type: application/json' \
+	-X POST "http://127.0.0.1:$GRAFANA_PORT/api/ds/query" \
+	-d "$(jq -n --arg uid "$default_uid" '{
+		queries: [{refId: "A", datasource: {type: "prometheus", uid: $uid},
+			expr: "simplex_overall_severity", instant: true}],
+		from: "now-5m", to: "now"}')") ||
+	fail "POST /api/ds/query through the provisioned datasource failed"
+printf '%s' "$grafana_reply" | jq -e '
+	(.results.A.frames | length) > 0 and ((.results.A.frames[0].data.values[1] | length) > 0)' >/dev/null ||
+	fail "Grafana returned no sample for simplex_overall_severity: $grafana_reply"
 
 note "each expression returns what the fixture implies"
 VANTAGE=$(jq -r .vantage.status "$WORK/document.json")
