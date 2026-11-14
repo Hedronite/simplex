@@ -176,28 +176,48 @@ func TestTheListIsWellFormed(t *testing.T) {
 	}
 }
 
-// TestNoInternalNamesInTrackedFiles is the gate.
+// trackedFiles lists the tracked paths under root. It is an error, not an
+// empty list, when root is not a repository: a gate that finds nothing to scan
+// has not passed.
+func trackedFiles(root string) ([]string, error) {
+	cmd := exec.Command("git", "ls-files", "-z")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files in %s: %w", root, err)
+	}
+	var files []string
+	for _, rel := range strings.Split(string(out), "\x00") {
+		if rel != "" {
+			files = append(files, rel)
+		}
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("git ls-files in %s listed no files", root)
+	}
+	return files, nil
+}
+
+func TestNoRepositoryIsAnErrorNotAnEmptyPass(t *testing.T) {
+	if files, err := trackedFiles(t.TempDir()); err == nil {
+		t.Fatalf("a directory that is not a repository listed %d file(s) without an error", len(files))
+	}
+}
+
+// TestNoInternalNamesInTrackedFiles is the gate. It never skips: if there is no
+// repository to list, it fails, so a source archive or a CI checkout without
+// history cannot read as a pass.
 func TestNoInternalNamesInTrackedFiles(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("git", "ls-files", "-z")
-	cmd.Dir = root
-	out, err := cmd.Output()
+	files, err := trackedFiles(root)
 	if err != nil {
-		// A source archive has no repository to list. CI always has one, so a
-		// missing list there is a failure, not a skip.
-		if os.Getenv("CI") != "" {
-			t.Fatalf("git ls-files failed in CI: %v", err)
-		}
-		t.Skipf("no git repository to list: %v", err)
+		t.Fatalf("the gate has nothing to scan: %v", err)
 	}
 	var findings []string
-	for _, rel := range strings.Split(string(out), "\x00") {
-		if rel == "" {
-			continue
-		}
+	for _, rel := range files {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		info, err := os.Lstat(path)
 		if err != nil || !info.Mode().IsRegular() || info.Size() > maxFileBytes {
