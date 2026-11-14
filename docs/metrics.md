@@ -39,11 +39,12 @@ Rulings baked into this table:
   **frozen enums**, not over what the document carries: every check exports a
   series for every result value and every reason code, 1 or 0. Series stay
   stable, so a clearing reason reads 1 to 0 and PromQL needs no `absent()`;
+  an unknown code can never become a label.
 - the five enrichment codes from `docs/semantics.md` section 15 carry their
   own one-hot series under `simplex_check_reason`, with `reason` labels
   `ts_peer_online`, `ts_peer_offline`, `ts_peer_unmatched`, `ts_path_direct`
   and `ts_path_relayed`. Enrichment is informational: it never moves a
-  severity, so these series explain and never alert;
+  severity, so these series explain and never alert.
   an unknown code can never become a label.
 - `simplex_check_reason` is driven by the frozen enum even if a document
   carried a code the contract does not know: the label space cannot grow past

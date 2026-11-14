@@ -9,11 +9,11 @@ normal deployment decision.
 ## What it needs
 
 - Grafana 13.x (the JSON carries `schemaVersion` 42; Grafana migrates older
-  numbers up, and the import test runs the provisioning path on Grafana
-  13.2.4).
-- A Prometheus datasource with uid `lea-prom` that scrapes `simplex serve`.
-  Every panel and every variable in the dashboard names exactly that
-  datasource; if your uid differs, change it once in the JSON.
+  numbers up on import).
+- A Prometheus datasource that scrapes `simplex serve`, with the uid
+  `lea-prom`: every panel and every variable in the dashboard names exactly
+  that datasource by uid. The uid must match an existing datasource in your
+  Grafana; if yours differs, change it once in the JSON.
 
 ## Provisioning
 

@@ -29,21 +29,32 @@ can observe itself.
 ## Quickstart
 
 A run needs a public config (slugs only) and, for any check that needs an
-address, a private overlay file that is never committed. `example.yaml` in this
-repository is a complete public config:
+address, a private overlay file that is never committed. `example.yaml` in
+this repository is a complete public config. `validate` is the first command
+to run: it needs no overlay and no network.
 
 ```console
-$ simplex check --config example.yaml
-$ simplex check --config example.yaml --json
 $ simplex validate --config example.yaml
-$ simplex serve --config example.yaml
+warning: no overlay found: addresses not checked
+$ echo $?
+0
 ```
 
-`check` renders the table by default; `--json` prints the `simplex.probe/v0`
-document. Exit codes are identical in both modes. The table from a machine with
-no route to the mesh (a blind vantage, exit 5 — not a mesh failure):
+Create the overlay (private, never committed) and `check` works. The table
+below comes from a machine with no tailnet address, so the vantage is blind —
+exit 5, which is "I am cut off", not a mesh failure:
 
 ```console
+$ cat > simplex.overlay.yaml <<EOF
+apiVersion: simplex.overlay/v0
+hosts:
+  tower:
+    address: tower.invalid
+  box:
+    address: box.invalid
+  lathe:
+    address: lathe.invalid
+EOF
 $ simplex check --config example.yaml
 HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
 box    prom_up :9090/metrics        light     unknown  RED       vantage_blind
@@ -55,20 +66,9 @@ $ echo $?
 5
 ```
 
-`validate` loads and checks the config and overlay without probing; it prints
-one finding per line, exits 0 with warnings and 3 with errors. On a clean
-checkout there is no private overlay to read, so the addresses are not checked
-and validate says so:
-
-```console
-$ simplex validate --config example.yaml
-warning: no overlay found: addresses not checked
-$ echo $?
-0
-```
-
-With an overlay present (never committed), the same command resolves every
-check against it and is quiet when the config is valid.
+With an overlay present and the addresses reachable, the same command reports
+the real verdicts. `--json` prints the `simplex.probe/v0` document instead;
+exit codes are identical in both modes.
 
 `version` prints one line, or a JSON object with `--json`:
 
@@ -82,9 +82,7 @@ $ simplex version --json
 A source build prints the fallbacks above; a release build prints its version,
 commit and built date in the same shapes.
 
-- `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
-- Releases are produced with reproducible builds; until then, build from source
-  with Go 1.27 or newer.
+`serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
 
 ## The document
 
@@ -200,8 +198,8 @@ Benchmark, profile and soak results, and the gates they feed, are in
 
 `simplex serve` probes on an interval and serves the latest result as
 Prometheus metrics on `GET /metrics`, loopback by default at
-`127.0.0.1:10081` (the `contract.MetricsListen` constant — `serve --help`
-quotes it from there). It binds loopback only; a non-loopback `--listen` is
+`127.0.0.1:10081` (the default `serve --help` quotes). It binds loopback
+only; a non-loopback `--listen` is
 refused unless `--unsafe-allow-non-loopback` is set, and then a warning is
 logged on every start: `/metrics` has no authentication.
 

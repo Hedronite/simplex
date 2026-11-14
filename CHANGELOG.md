@@ -17,8 +17,8 @@ and the release tooling.
   prose together.
 - `simplex check`: one probe pass from a configurable vantage — the human
   table by default, the document with `--json`, `--out` for the document
-  file, and the five-severity exit-code mapping (0 GREEN through 5 vantage
-  blind).
+  file, and the exit-code mapping: 0 GREEN, 1 YELLOW, 2 RED by verdict,
+  3 config or usage error, 4 runtime or I/O error, 5 vantage blind.
 - `simplex validate`: strict config and overlay loading without probing, with
   every finding on stdout in human or `--json` form.
 - `simplex serve`: probe passes on an interval with `GET /metrics` on
@@ -33,9 +33,6 @@ and the release tooling.
   codes to `ts_reach` checks. Informational only; never changes a verdict.
 - A Grafana dashboard with its file provider, and the drift test that keeps
   the dashboard's queries in step with the exported series.
-- A release pipeline: reproducible builds with SBOM and signature, pinned
-  workflow actions, and benchmarks, profiles and a soak pass in CI.
-
 ### Security
 
 - Inspect-only by design: probes send no credentials, never mutate a host,
