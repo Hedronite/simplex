@@ -3,7 +3,7 @@
 # Nothing runs without a pushed `v*` tag, and nothing is published by CI: the
 # release is created as a draft, so publishing is a human action. The
 # environment named here carries the required reviewer, which is the second
-# gate Evan asked for.
+# gate a release has to pass.
 name: release
 
 on:
