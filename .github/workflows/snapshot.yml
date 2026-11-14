@@ -1,0 +1,176 @@
+# Snapshot builds: reproducibility, stamps, SBOMs and signatures.
+#
+# Nothing here publishes. The release workflow is the only thing that can, and
+# only on a tag. This job exists to prove the claims SPEC section 7 makes
+# before a tag exists:
+#
+#   1. two builds of one commit are byte-identical, on two runner images;
+#   2. the binaries are stamped from ldflags, not from the fallbacks;
+#   3. every archive carries an SBOM that lists what ships and not the
+#      test-only modules;
+#   4. signing works, exercised with a throwaway key so the step is proved
+#      without consuming a real identity or writing to the transparency log.
+#
+# Keyless signing belongs to the release workflow, where the OIDC identity is
+# the point; a snapshot build has no release identity to prove.
+name: snapshot
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: snapshot build
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          args: release --snapshot --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: publish the checksums for comparison
+        run: |
+          set -euo pipefail
+          cp dist/checksums.txt "checksums-${RUNNER_IMAGE}.txt"
+          cat "checksums-${RUNNER_IMAGE}.txt"
+        env:
+          RUNNER_IMAGE: ${{ matrix.runner }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checksums-${{ matrix.runner }}
+          path: checksums-*.txt
+          if-no-files-found: error
+          retention-days: 7
+      # The remaining checks run once, on the leg that has the artifacts in
+      # hand, so they are not repeated per runner.
+      - name: release-shaped build, SBOM and signature
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          set -euo pipefail
+
+          ./scripts/release-check.sh check dist
+
+          # A throwaway key proves the signing and verification path without a
+          # real identity: no Fulcio, no transparency-log entry. cosign v3 signs
+          # into a bundle; the separate signature and certificate flags are gone.
+          cosign generate-key-pair
+          cosign sign-blob --yes --key cosign.key \
+            --bundle dist/checksums.txt.sigstore.json \
+            dist/checksums.txt
+          cosign verify-blob --key cosign.pub \
+            --bundle dist/checksums.txt.sigstore.json \
+            dist/checksums.txt
+          echo "== throwaway-key signature verifies against dist/checksums.txt"
+          rm -f cosign.key && echo "the throwaway private key is gone"
+      - name: keep the dist layout for review
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          ls -l dist | head -30
+          for f in dist/*.tar.gz; do echo "--- $f"; tar tzf "$f"; done
+
+  build-odd-uid:
+    name: build (uid 12345)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: install goreleaser
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          install-only: true
+      - name: snapshot as an account no runner shares
+        # The runner's own uid is 1001 on every image, so a comparison between
+        # two runners cannot see a leaked uid. This build runs as 12345, an
+        # account with no passwd entry, and its archives must still match the
+        # others byte for byte.
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gocache"
+          chmod 0777 "$RUNNER_TEMP/gocache"
+          # The checkout belongs to the runner's uid, so the build user must be
+          # given write access and git's directory check must be told whose tree
+          # this is; otherwise the build stops before it writes an archive.
+          chmod -R a+rwX .
+          docker run --rm -u 12345:12345 \
+            -v "$PWD:/src" -w /src \
+            -v "$(command -v goreleaser):/usr/local/bin/goreleaser:ro" \
+            -v "$RUNNER_TEMP/gocache:/gocache" \
+            -e HOME=/tmp -e GOCACHE=/gocache -e GOMODCACHE=/gocache/mod \
+            golang:1.27 \
+            sh -c 'git config --global --add safe.directory /src &&
+                   goreleaser release --snapshot --clean --skip=sbom --skip=sign'
+          sudo chown -R "$(id -u):$(id -g)" dist
+          cp dist/checksums.txt checksums-uid12345.txt
+          cat checksums-uid12345.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checksums-uid12345
+          path: checksums-uid12345.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  reproducible:
+    name: compare the two images
+    needs: build
+    # Run even when a build leg failed: a skipped comparison is how a
+    # reproducibility break hid once already. If the artifacts are not both
+    # there, the job fails and says so.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: checksums-*
+          path: artifacts
+      - name: compare
+        run: |
+          set -euo pipefail
+          i=0
+          mkdir -p cmp
+          for f in $(find artifacts -name 'checksums-*' -type f | sort); do
+            i=$((i + 1))
+            mkdir -p "cmp/$i"
+            cp "$f" "cmp/$i/checksums.txt"
+          done
+          if [ "$i" -lt 2 ]; then
+            echo "only $i checksums file(s) arrived; the builds must succeed before this can compare" >&2
+            find artifacts -type f >&2 || true
+            exit 1
+          fi
+          # Every build is compared against the first: two runners share a uid,
+          # the third does not, and all three must agree.
+          for n in $(seq 2 "$i"); do
+            ./scripts/release-check.sh compare cmp/1 "cmp/$n"
+          done

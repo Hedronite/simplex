@@ -1,0 +1,116 @@
+# Release: tag-triggered, keyless-signed, and a draft until a person publishes.
+#
+# Nothing runs without a pushed `v*` tag, and nothing is published by CI: the
+# release is created as a draft, so publishing is a human action. The
+# environment named here carries the required reviewer, which is the second
+# gate a release has to pass.
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  # Keyless signing: cosign exchanges this token for a short-lived Fulcio
+  # certificate tied to this workflow and ref, and records the signature in the
+  # transparency log. No private key exists to custody.
+  id-token: write
+
+jobs:
+  release:
+    name: draft release
+    # The only job with the environment, and the only one that can publish: the
+    # environment carries the required reviewer, and it accepts v* tags only.
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://github.com/Hedronite/simplex/releases
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: the tag and the toolchain must agree with the tree
+        run: |
+          set -euo pipefail
+          want=$(sed -n 's/^toolchain go\(.*\)$/\1/p' go.mod)
+          got=$(go version | awk '{print $3}' | sed 's/^go//')
+          if [ "$want" != "$got" ]; then
+            echo "go.mod names toolchain $want and this runner has $got" >&2
+            exit 1
+          fi
+          echo "== toolchain $got matches go.mod"
+      # goreleaser creates a DRAFT release, which is not public: a person
+      # publishes it. The checks below run against the artifacts it produced,
+      # and a failure deletes the draft, so a bad build never waits for someone
+      # to notice it.
+      - name: build and draft the release
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: release-shaped build and SBOMs
+        run: ./scripts/release-check.sh check dist
+      - name: sign the checksums keylessly
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes \
+            --bundle dist/checksums.txt.sigstore.json \
+            dist/checksums.txt
+      - name: verify with the identity this workflow just used
+        run: |
+          set -euo pipefail
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify-blob \
+            --bundle dist/checksums.txt.sigstore.json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            dist/checksums.txt
+          echo "== verified as $identity issued by $issuer"
+      - name: attach the signature bundle to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The archives goreleaser built are the bytes that were checked and
+          # signed, so only the bundle is added here: nothing already published
+          # is replaced after signing.
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/checksums.txt.sigstore.json --clobber
+          gh release view "${GITHUB_REF_NAME}" --json isDraft,assets \
+            --jq '{draft: .isDraft, assets: [.assets[].name]}'
+      - name: remove the draft if a check failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # gh release delete acts on any release for the tag, so the draft
+          # check comes first: a published release is never deleted here, and a
+          # failed check against a published tag fails loudly instead.
+          draft=$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq .isDraft 2>/dev/null || echo "absent")
+          case "$draft" in
+          true)
+            gh release delete "${GITHUB_REF_NAME}" --yes --cleanup-tag=false
+            echo "== removed the unpublished draft for ${GITHUB_REF_NAME}"
+            ;;
+          absent)
+            echo "no release for ${GITHUB_REF_NAME}; nothing to remove"
+            ;;
+          *)
+            echo "the release for ${GITHUB_REF_NAME} is not a draft (isDraft=$draft); refusing to delete it" >&2
+            exit 1
+            ;;
+          esac

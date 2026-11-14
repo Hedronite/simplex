@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -171,7 +172,8 @@ func BenchmarkCheckRun(b *testing.B) {
 			}
 			var dials atomic.Int64
 			runner := probe.New(&probe.Options{
-				Dialer: countingDialer{dials: &dials},
+				Dialer:    countingDialer{dials: &dials},
+				Transport: noTransport{},
 				// One attempt, no retry: the benchmark should not pay 250 ms per
 				// timeout, and a refusal is not retried anyway.
 				Timeout:     time.Second,
@@ -235,6 +237,16 @@ type countingDialer struct{ dials *atomic.Int64 }
 // DialContext counts the dial and refuses it.
 func (c countingDialer) DialContext(context.Context, string, string) (net.Conn, error) {
 	c.dials.Add(1)
+	return nil, refusal
+}
+
+// noTransport answers every HTTP request with a refusal, so a check of an HTTP
+// kind can never reach the network from these benchmarks even if a generator
+// later adds one. The probe's transport seam exists for exactly this.
+type noTransport struct{}
+
+// RoundTrip refuses without a socket.
+func (noTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, refusal
 }
 
