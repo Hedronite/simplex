@@ -57,8 +57,8 @@ hosts:
 EOF
 $ simplex check --config example.yaml
 HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
-edge    prom_up :9090/metrics        light     unknown  RED       vantage_blind
-lab  prom_up :9090/-/ready        light     unknown  RED       vantage_blind
+edge   prom_up :9090/metrics        light     unknown  RED       vantage_blind
+lab    prom_up :9090/-/ready        light     unknown  RED       vantage_blind
 spoke  kube_apiserver :6443         dark      unknown  RED       vantage_blind
 spoke  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
 spoke  ts_reach :9100               light     unknown  RED       vantage_blind
