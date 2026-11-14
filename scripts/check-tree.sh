@@ -124,6 +124,31 @@ while IFS= read -r f; do
 		done
 done <"$list"
 
+# 3. Workflow pins. Every action reference is a 40-hex commit (with the version
+#    in a trailing comment), a docker image digest, or a local path; a tag or a
+#    branch can move under a pinned workflow, a commit cannot. No tool is run or
+#    installed at a moving version either (@latest, @main, @master).
+while IFS= read -r wf; do
+	[ -n "$wf" ] || continue
+	grep -nE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*' "$wf" 2>/dev/null |
+		while IFS=: read -r line text; do
+			ref=$(printf '%s' "$text" |
+				sed -E 's/^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*//; s/[[:space:]]+#.*$//; s/[[:space:]]+$//; s/^["'"'"']//; s/["'"'"']$//')
+			if printf '%s' "$ref" | grep -qE '^\./' ||
+				printf '%s' "$ref" | grep -qE '^docker://[^@]+@sha256:[0-9a-f]{64}$' ||
+				printf '%s' "$ref" | grep -qE '^[^@[:space:]]+@[0-9a-f]{40}$'; then
+				continue
+			fi
+			record "$wf:$line: action is not pinned to a commit: $ref"
+		done
+	grep -nE '@(latest|main|master)([^A-Za-z0-9_.-]|$)' "$wf" 2>/dev/null |
+		while IFS=: read -r line text; do
+			record "$wf:$line: a tool is fetched at a moving version: $text"
+		done
+done <<EOF_WORKFLOWS
+$(grep -E '^\.github/workflows/.*\.ya?ml$' "$list")
+EOF_WORKFLOWS
+
 if [ -s "$findings" ]; then
 	sed 's/^/FAIL /' "$findings"
 	printf 'FAIL tracked tree: %s finding(s)\n' "$(wc -l <"$findings" | tr -d ' ')"
