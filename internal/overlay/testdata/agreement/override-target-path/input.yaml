@@ -1,6 +1,6 @@
 apiVersion: simplex.overlay/v0
 hosts:
-  box:
+  edge:
     address: "192.0.2.10"
     overrides:
       - {kind: prom_up, target: ":9090/-/ready", path: /metrics, port: 9091}

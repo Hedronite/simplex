@@ -28,19 +28,19 @@ const statusFixture = `{
       "Online": true,
       "CurAddr": "192.0.2.10:41641",
       "Relay": "relay.example",
-      "DNSName": "tower.example.",
+      "DNSName": "spoke.example.",
       "TailscaleIPs": ["192.0.2.10"]
     },
     "node-relayed": {
       "Online": false,
       "Relay": "relay.example",
-      "DNSName": "box.example.",
+      "DNSName": "edge.example.",
       "TailscaleIPs": ["198.51.100.7"]
     },
     "node-plain": {
       "Online": true,
       "CurAddr": "198.51.100.9:41641",
-      "DNSName": "apiary.example.",
+      "DNSName": "core.example.",
       "TailscaleIPs": ["198.51.100.9"]
     }
   }
@@ -196,13 +196,13 @@ func TestStatusSuccessAndMatches(t *testing.T) {
 		},
 		{
 			name:    "MagicDNS name, upper case and trailing dot",
-			address: "TOWER.EXAMPLE.",
+			address: "SPOKE.EXAMPLE.",
 			want:    Enrichment{Online: true, Direct: true, Relayed: false},
 			matched: true,
 		},
 		{
 			name:    "MagicDNS name without the trailing dot",
-			address: "box.example",
+			address: "edge.example",
 			want:    Enrichment{Online: false, Direct: false, Relayed: true},
 			matched: true,
 		},
@@ -398,7 +398,7 @@ func TestPayloadLimits(t *testing.T) {
 // TestNoPayloadTextInErrors is the leak test: a malformed payload full of
 // documentation values must not leave a trace in the error.
 func TestNoPayloadTextInErrors(t *testing.T) {
-	const leaky = `{"BackendState": "192.0.2.10", "Peer": {"node": {"DNSName": "tower.example.", "TailscaleIPs": ["198.51.100.7"], "CurAddr": "192.0.2.10:41641", "Relay": "relay.example"}, "broken": `
+	const leaky = `{"BackendState": "192.0.2.10", "Peer": {"node": {"DNSName": "spoke.example.", "TailscaleIPs": ["198.51.100.7"], "CurAddr": "192.0.2.10:41641", "Relay": "relay.example"}, "broken": `
 	d := newFakeDaemon(t, serveBody(http.StatusOK, leaky))
 	_, err := d.client(t).Status(context.Background())
 	if err == nil {
@@ -408,7 +408,7 @@ func TestNoPayloadTextInErrors(t *testing.T) {
 	for _, leak := range []string{
 		"192.0.2.10",
 		"198.51.100.7",
-		"tower.example",
+		"spoke.example",
 		"relay.example",
 		"CurAddr",
 		"Relay",

@@ -101,38 +101,38 @@ func findingSay(findings []Finding, level Level, path, substr string) bool {
 	return false
 }
 
-const goodHeader = "apiVersion: simplex.config/v0\nvantage:\n  id: lathe\n"
+const goodHeader = "apiVersion: simplex.config/v0\nvantage:\n  id: lab\n"
 
 func TestLoadRules(t *testing.T) {
 	cases := []loadCase{
 		{
 			name:  "minimal config loads clean",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			noErr: true,
 		},
 		{
 			name:  "unknown top-level key",
-			input: goodHeader + "pot: 1\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "pot: 1\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			want:  []findingKey{{LevelError, "pot"}},
 		},
 		{
 			name:   "unknown major version",
-			input:  "apiVersion: simplex.config/v1\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input:  "apiVersion: simplex.config/v1\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{{LevelError, "apiVersion"}: "simplex.config/v1"},
 		},
 		{
 			name:  "missing apiVersion",
-			input: "vantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: "vantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			want:  []findingKey{{LevelError, "apiVersion"}},
 		},
 		{
 			name:  "missing vantage",
-			input: "apiVersion: simplex.config/v0\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: "apiVersion: simplex.config/v0\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			want:  []findingKey{{LevelError, "vantage"}},
 		},
 		{
 			name:  "vantage id not a slug",
-			input: "apiVersion: simplex.config/v0\nvantage:\n  id: Lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: "apiVersion: simplex.config/v0\nvantage:\n  id: Lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "vantage.id"}: "not a slug",
 			},
@@ -144,132 +144,132 @@ func TestLoadRules(t *testing.T) {
 		},
 		{
 			name:  "host without checks",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks: []\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks: []\n",
 			want:  []findingKey{{LevelError, "hosts[0].checks"}},
 		},
 		{
 			name:  "missing expected",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach}\n",
 			want:  []findingKey{{LevelError, "hosts[0].checks[0].expected"}},
 		},
 		{
 			name:  "bad expected value",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: dim}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: dim}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[0].expected"}: "light",
 			},
 		},
 		{
 			name:  "path on a non-prom_up kind",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light, path: /metrics}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light, path: /metrics}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[0].path"}: "legal only on a prom_up check",
 			},
 		},
 		{
 			name:  "path off the allowlist",
-			input: goodHeader + "hosts:\n  - id: box\n    checks:\n      - {kind: prom_up, expected: light, path: /debug}\n",
+			input: goodHeader + "hosts:\n  - id: edge\n    checks:\n      - {kind: prom_up, expected: light, path: /debug}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[0].path"}: "allowlist",
 			},
 		},
 		{
 			name:  "denied port",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light, port: 18080}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light, port: 18080}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[0].port"}: "never dialed",
 			},
 		},
 		{
 			name:  "port out of range",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light, port: 70000}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light, port: 70000}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[0].port"}: "between 1 and 65535",
 			},
 		},
 		{
 			name:  "port is not an integer",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light, port: \"9100\"}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light, port: \"9100\"}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[0].port"}: "want an integer",
 			},
 		},
 		{
 			name:  "canary kind must be ts_reach",
-			input: goodHeader + "  canaries:\n    - {host: tower, kind: node_exporter, target: \":9100\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "  canaries:\n    - {host: spoke, kind: node_exporter, target: \":9100\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "vantage.canaries[0].kind"}: "ts_reach",
 			},
 		},
 		{
 			name:  "canary target malformed",
-			input: goodHeader + "  canaries:\n    - {host: tower, kind: ts_reach, target: \"9100\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "  canaries:\n    - {host: spoke, kind: ts_reach, target: \"9100\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "vantage.canaries[0].target"}: "want a target",
 			},
 		},
 		{
 			name:  "canary host unknown",
-			input: goodHeader + "  canaries:\n    - {host: ghost, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "  canaries:\n    - {host: ghost, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "vantage.canaries[0].host"}: "not configured",
 			},
 		},
 		{
 			name:  "canary target does not match the effective target",
-			input: goodHeader + "  canaries:\n    - {host: tower, kind: ts_reach, target: \":9101\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "  canaries:\n    - {host: spoke, kind: ts_reach, target: \":9101\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "vantage.canaries[0].target"}: "answers",
 			},
 		},
 		{
 			name:  "duplicate host id",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n  - id: tower\n    checks:\n      - {kind: node_exporter, expected: light}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n  - id: spoke\n    checks:\n      - {kind: node_exporter, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[1].id"}: "duplicate host id",
 			},
 		},
 		{
 			name:  "duplicate check identity on one host",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n      - {kind: ts_reach, expected: light}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n      - {kind: ts_reach, expected: light}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "hosts[0].checks[1]"}: "duplicate check",
 			},
 		},
 		{
 			name:  "same kind twice with different ports is two checks",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: prom_up, expected: light}\n      - {kind: prom_up, expected: light, port: 9091}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: prom_up, expected: light}\n      - {kind: prom_up, expected: light, port: 9091}\n",
 			noErr: true,
 		},
 		{
 			name:  "hold without until",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: tower, kind: ts_reach, reason: maintenance}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: spoke, kind: ts_reach, reason: maintenance}\n",
 			want:  []findingKey{{LevelError, "holds[0].until"}},
 		},
 		{
 			name:  "hold with a bad until",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: tomorrow}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: spoke, kind: ts_reach, reason: maintenance, until: tomorrow}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "holds[0].until"}: "RFC 3339",
 			},
 		},
 		{
 			name:  "hold with an unknown kind",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: tower, kind: ping, reason: maintenance, until: \"2027-01-01T00:00:00Z\"}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: spoke, kind: ping, reason: maintenance, until: \"2027-01-01T00:00:00Z\"}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "holds[0].kind"}: "unknown check kind",
 			},
 		},
 		{
 			name:  "hold with a bad host slug",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: Tower, kind: ts_reach, reason: maintenance, until: \"2027-01-01T00:00:00Z\"}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: Spoke, kind: ts_reach, reason: maintenance, until: \"2027-01-01T00:00:00Z\"}\n",
 			wantIn: map[findingKey]string{
 				{LevelError, "holds[0].host"}: "slug",
 			},
 		},
 		{
 			name:  "hold without a reason",
-			input: goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: tower, kind: ts_reach, until: \"2027-01-01T00:00:00Z\"}\n",
+			input: goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\nholds:\n  - {host: spoke, kind: ts_reach, until: \"2027-01-01T00:00:00Z\"}\n",
 			want:  []findingKey{{LevelError, "holds[0].reason"}},
 		},
 		{
@@ -307,11 +307,11 @@ func TestLoadRules(t *testing.T) {
 }
 
 func TestLoadHolds(t *testing.T) {
-	base := goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"
+	base := goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"
 	t.Run("expired hold is a warning and stays listed", func(t *testing.T) {
 		cfg, findings, _ := runLoad(t, loadCase{
 			name:  "expired hold",
-			input: base + "holds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: \"2026-11-13T00:00:00Z\"}\n",
+			input: base + "holds:\n  - {host: spoke, kind: ts_reach, reason: maintenance, until: \"2026-11-13T00:00:00Z\"}\n",
 			want:  []findingKey{{LevelWarning, "holds[0].until"}},
 			noErr: true,
 		})
@@ -328,7 +328,7 @@ func TestLoadHolds(t *testing.T) {
 	t.Run("active hold is clean", func(t *testing.T) {
 		cfg, findings, _ := runLoad(t, loadCase{
 			name:  "active hold",
-			input: base + "holds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: \"2027-01-01T00:00:00Z\"}\n",
+			input: base + "holds:\n  - {host: spoke, kind: ts_reach, reason: maintenance, until: \"2027-01-01T00:00:00Z\"}\n",
 			noErr: true,
 		})
 		if len(findings) != 0 {
@@ -352,10 +352,10 @@ func TestHoldExpiryBoundary(t *testing.T) {
 	// until == now is expired, until == now+1s is live.
 	at := time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return at }
-	base := goodHeader + "hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"
+	base := goodHeader + "hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"
 
 	t.Run("until equal to the run clock is expired", func(t *testing.T) {
-		cfg, findings, err := Parse([]byte(base+"holds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: \"2026-11-13T18:00:00Z\"}\n"), clock)
+		cfg, findings, err := Parse([]byte(base+"holds:\n  - {host: spoke, kind: ts_reach, reason: maintenance, until: \"2026-11-13T18:00:00Z\"}\n"), clock)
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
@@ -370,7 +370,7 @@ func TestHoldExpiryBoundary(t *testing.T) {
 		}
 	})
 	t.Run("until one second after the run clock is live", func(t *testing.T) {
-		cfg, findings, err := Parse([]byte(base+"holds:\n  - {host: tower, kind: ts_reach, reason: maintenance, until: \"2026-11-13T18:00:01Z\"}\n"), clock)
+		cfg, findings, err := Parse([]byte(base+"holds:\n  - {host: spoke, kind: ts_reach, reason: maintenance, until: \"2026-11-13T18:00:01Z\"}\n"), clock)
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
@@ -387,22 +387,22 @@ func TestLoadDefaultsAndTargets(t *testing.T) {
 	cfg, _, _ := runLoad(t, loadCase{
 		name: "defaults and effective targets",
 		input: goodHeader + "hosts:\n" +
-			"  - id: tower\n    checks:\n" +
+			"  - id: spoke\n    checks:\n" +
 			"      - {kind: ts_reach, expected: light}\n" +
 			"      - {kind: node_exporter, expected: light}\n" +
 			"      - {kind: kube_apiserver, expected: dark}\n" +
 			"      - {kind: ssh, expected: light}\n" +
-			"  - id: box\n    checks:\n" +
+			"  - id: edge\n    checks:\n" +
 			"      - {kind: prom_up, expected: light, path: /metrics, port: 9091}\n",
 		noErr: true,
 	})
 	got := cfg.EffectiveChecks()
 	wantTargets := map[string]string{
-		"tower ts_reach":       ":9100",
-		"tower node_exporter":  ":9100/metrics",
-		"tower kube_apiserver": ":6443",
-		"tower ssh":            ":22",
-		"box prom_up":          ":9091/metrics",
+		"spoke ts_reach":       ":9100",
+		"spoke node_exporter":  ":9100/metrics",
+		"spoke kube_apiserver": ":6443",
+		"spoke ssh":            ":22",
+		"edge prom_up":         ":9091/metrics",
 	}
 	if len(got) != len(wantTargets) {
 		t.Fatalf("want %d effective checks, got %d", len(wantTargets), len(got))

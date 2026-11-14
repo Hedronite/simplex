@@ -1,17 +1,17 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "unchecked"},
+  "vantage": {"id": "lab", "status": "unchecked"},
   "overall": "GREEN",
   "hosts": [
-    {"id": "box", "severity": "GREEN", "reasons": []},
-    {"id": "lathe", "severity": "GREEN", "reasons": []}
+    {"id": "edge", "severity": "GREEN", "reasons": []},
+    {"id": "lab", "severity": "GREEN", "reasons": []}
   ],
   "checks": [
-    {"host": "box", "kind": "prom_up", "target": ":9090/metrics", "result": "up",
+    {"host": "edge", "kind": "prom_up", "target": ":9090/metrics", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": []},
-    {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
+    {"host": "lab", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": []}
   ]

@@ -1,13 +1,13 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "unchecked"},
+  "vantage": {"id": "lab", "status": "unchecked"},
   "overall": "YELLOW",
   "hosts": [
-    {"id": "tower", "severity": "YELLOW", "reasons": ["probe_unknown", "tcp_connect_timeout"]}
+    {"id": "spoke", "severity": "YELLOW", "reasons": ["probe_unknown", "tcp_connect_timeout"]}
   ],
   "checks": [
-    {"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "unknown",
+    {"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "unknown",
      "severity": "YELLOW", "expected": "light",
      "reasons": ["probe_unknown", "tcp_connect_timeout"]}
   ]

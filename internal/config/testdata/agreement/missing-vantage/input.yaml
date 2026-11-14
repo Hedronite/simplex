@@ -1,5 +1,5 @@
 apiVersion: simplex.config/v0
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}

@@ -7,22 +7,22 @@ apiVersion: simplex.config/v0
 # configured ts_reach checks; if every canary fails, the vantage is blind
 # (exit 5) instead of reporting a false mesh-wide RED.
 vantage:
-  id: lathe
+  id: lab
   canaries:
-    - {host: tower, kind: ts_reach, target: ":9100"}
+    - {host: spoke, kind: ts_reach, target: ":9100"}
 
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}           # target defaults to ":9100"
       - {kind: node_exporter, expected: light}      # GET /metrics, default port 9100
       - {kind: kube_apiserver, expected: dark}      # TCP connect to ":6443", dark by design
 
-  - id: box
+  - id: edge
     checks:
       - {kind: prom_up, expected: light, path: /metrics}  # path allowlist: /metrics, /-/ready, /-/healthy
 
-  - id: lathe
+  - id: lab
     checks:
       - {kind: prom_up, expected: light}            # path defaults to /-/ready
 
@@ -30,7 +30,7 @@ hosts:
 # ignored and `simplex validate` warns about it. A held check still runs and
 # reports its real result, but never counts toward YELLOW or RED.
 holds:
-  - host: tower              # host slug or "*"
+  - host: spoke              # host slug or "*"
     kind: ts_reach           # kind or "*"
     reason: planned maintenance
     until: "2030-01-01T00:00:00Z"   # RFC 3339; illustrative, set it to the end of a real announced dark

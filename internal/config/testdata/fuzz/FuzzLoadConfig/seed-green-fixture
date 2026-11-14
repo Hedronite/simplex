@@ -1,2 +1,2 @@
 go test fuzz v1
-[]byte("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n")
+[]byte("apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n")

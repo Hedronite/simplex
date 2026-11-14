@@ -1,6 +1,6 @@
 HOST   CHECK                        EXPECTED  RESULT  SEVERITY  REASONS
-box    prom_up :9090/-/ready        light     up      GREEN
-lathe  prom_up :9090/-/ready        light     up      GREEN
-tower  kube_apiserver :6443         dark      down    GREEN     expected_dark, tcp_connect_refused
-tower  node_exporter :9100/metrics  light     up      GREEN
-tower  ts_reach :9100               light     up      GREEN     tcp_connect_ok
+edge   prom_up :9090/-/ready        light     up      GREEN
+lab    prom_up :9090/-/ready        light     up      GREEN
+spoke  kube_apiserver :6443         dark      down    GREEN     expected_dark, tcp_connect_refused
+spoke  node_exporter :9100/metrics  light     up      GREEN
+spoke  ts_reach :9100               light     up      GREEN     tcp_connect_ok

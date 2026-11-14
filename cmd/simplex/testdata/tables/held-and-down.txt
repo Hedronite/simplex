@@ -1,2 +1,2 @@
 HOST  CHECK                        EXPECTED  RESULT  SEVERITY  REASONS
-box   node_exporter :9100/metrics  light     down    GREEN     held, tcp_connect_refused
+edge  node_exporter :9100/metrics  light     down    GREEN     held, tcp_connect_refused

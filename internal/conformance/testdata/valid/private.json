@@ -1,7 +1,7 @@
 {
   "apiVersion": "simplex.overlay/v0",
   "hosts": {
-    "box": {
+    "edge": {
       "address": "placeholder.invalid",
       "overrides": [
         {

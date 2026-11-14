@@ -92,7 +92,7 @@ func observation(checks, i int) severity.Observation {
 func input(checks int) *severity.Input {
 	in := &severity.Input{
 		Now:           time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC),
-		VantageID:     "lathe",
+		VantageID:     "lab",
 		VantageStatus: contract.VantageOK,
 		Checks:        make([]severity.Observation, checks),
 	}
@@ -119,7 +119,7 @@ func doc(checks int) *document.Document {
 func configYAML(checks int) []byte {
 	var b strings.Builder
 	b.WriteString("apiVersion: simplex.config/v0\n")
-	b.WriteString("vantage:\n  id: lathe\n")
+	b.WriteString("vantage:\n  id: lab\n")
 	b.WriteString("hosts:\n")
 	for i := 0; i < checks; i++ {
 		fmt.Fprintf(&b, "  - id: %s\n    checks:\n      - {kind: ts_reach, expected: light}\n", slug(i))

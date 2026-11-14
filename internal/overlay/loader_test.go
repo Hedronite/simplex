@@ -20,68 +20,68 @@ func TestLoadOverlayRules(t *testing.T) {
 	}{
 		{
 			name:  "minimal overlay loads clean",
-			input: "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n",
+			input: "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n",
 			clean: true,
 		},
 		{
 			name:   "unknown top-level key",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\npot: 1\n",
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\npot: 1\n",
 			wantIn: map[string]string{"pot": "unknown key"},
 		},
 		{
 			name:   "unknown major",
-			input:  "apiVersion: simplex.overlay/v1\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n",
+			input:  "apiVersion: simplex.overlay/v1\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n",
 			wantIn: map[string]string{"apiVersion": "unsupported apiVersion"},
 		},
 		{
 			name:   "missing apiVersion",
-			input:  "hosts:\n  tower:\n    address: \"tailnet-tower\"\n",
+			input:  "hosts:\n  spoke:\n    address: \"tailnet-spoke\"\n",
 			wantIn: map[string]string{"apiVersion": "required"},
 		},
 		{
 			name:   "missing address",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower: {}\n",
-			wantIn: map[string]string{"hosts.tower.address": "required"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke: {}\n",
+			wantIn: map[string]string{"hosts.spoke.address": "required"},
 		},
 		{
 			name:   "empty address",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"\"\n",
-			wantIn: map[string]string{"hosts.tower.address": "required"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"\"\n",
+			wantIn: map[string]string{"hosts.spoke.address": "required"},
 		},
 		{
 			name:   "bad slug key",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  Tower:\n    address: \"tailnet-tower\"\n",
-			wantIn: map[string]string{"hosts.Tower": "not a slug"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  Spoke:\n    address: \"tailnet-spoke\"\n",
+			wantIn: map[string]string{"hosts.Spoke": "not a slug"},
 		},
 		{
 			name:   "denied port override",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    overrides:\n      - {kind: ts_reach, port: 18080}\n",
-			wantIn: map[string]string{"hosts.tower.overrides[0].port": "never dialed"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    overrides:\n      - {kind: ts_reach, port: 18080}\n",
+			wantIn: map[string]string{"hosts.spoke.overrides[0].port": "never dialed"},
 		},
 		{
 			name:   "path on a non-prom_up override",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    overrides:\n      - {kind: ts_reach, path: /metrics}\n",
-			wantIn: map[string]string{"hosts.tower.overrides[0].path": "legal only on a prom_up check"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    overrides:\n      - {kind: ts_reach, path: /metrics}\n",
+			wantIn: map[string]string{"hosts.spoke.overrides[0].path": "legal only on a prom_up check"},
 		},
 		{
 			name:   "override path off the allowlist",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  box:\n    address: \"tailnet-tower\"\n    overrides:\n      - {kind: prom_up, path: /debug}\n",
-			wantIn: map[string]string{"hosts.box.overrides[0].path": "allowlist"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  edge:\n    address: \"tailnet-spoke\"\n    overrides:\n      - {kind: prom_up, path: /debug}\n",
+			wantIn: map[string]string{"hosts.edge.overrides[0].path": "allowlist"},
 		},
 		{
 			name:   "override target malformed",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    overrides:\n      - {kind: ts_reach, target: \"9100\"}\n",
-			wantIn: map[string]string{"hosts.tower.overrides[0].target": "want a target"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    overrides:\n      - {kind: ts_reach, target: \"9100\"}\n",
+			wantIn: map[string]string{"hosts.spoke.overrides[0].target": "want a target"},
 		},
 		{
 			name:   "override kind unknown",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    overrides:\n      - {kind: ping}\n",
-			wantIn: map[string]string{"hosts.tower.overrides[0].kind": "unknown check kind"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    overrides:\n      - {kind: ping}\n",
+			wantIn: map[string]string{"hosts.spoke.overrides[0].kind": "unknown check kind"},
 		},
 		{
 			name:   "lan_address empty",
-			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    lan_address: \"\"\n",
-			wantIn: map[string]string{"hosts.tower.lan_address": "non-empty"},
+			input:  "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    lan_address: \"\"\n",
+			wantIn: map[string]string{"hosts.spoke.lan_address": "non-empty"},
 		},
 		{
 			name:   "not valid YAML",
@@ -95,7 +95,7 @@ func TestLoadOverlayRules(t *testing.T) {
 		},
 		{
 			name:   "hosts is not a mapping",
-			input:  "apiVersion: simplex.overlay/v0\nhosts: [tower]\n",
+			input:  "apiVersion: simplex.overlay/v0\nhosts: [spoke]\n",
 			wantIn: map[string]string{"hosts": "want a mapping"},
 		},
 	}
@@ -134,7 +134,7 @@ func TestLoadOverlayRules(t *testing.T) {
 }
 
 func TestDuplicateKeysRejected(t *testing.T) {
-	_, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    address: \"tailnet-lathe\"\n"))
+	_, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    address: \"tailnet-lab\"\n"))
 	var typed *Error
 	if !errors.As(err, &typed) {
 		t.Fatalf("want a typed error, got %v", err)
@@ -160,18 +160,18 @@ func fixtureConfig(t *testing.T) *config.Config {
 	raw := `
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}
       - {kind: lan_reach, expected: light}
       - {kind: node_exporter, expected: light}
       - {kind: kube_apiserver, expected: dark}
-  - id: box
+  - id: edge
     checks:
       - {kind: prom_up, expected: light}
-  - id: lathe
+  - id: lab
     checks:
       - {kind: prom_up, expected: light}
 `
@@ -184,18 +184,18 @@ hosts:
 
 func TestResolve(t *testing.T) {
 	ov, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n" +
-		"  tower:\n" +
-		"    address: \"tailnet-tower\"\n" +
-		"    lan_address: \"lan-tower\"\n" +
+		"  spoke:\n" +
+		"    address: \"tailnet-spoke\"\n" +
+		"    lan_address: \"lan-spoke\"\n" +
 		"    overrides:\n" +
 		"      - {kind: ts_reach, port: 9101}\n" +
 		"      - {kind: node_exporter, port: 9102}\n" +
-		"  box:\n" +
-		"    address: \"tailnet-box\"\n" +
+		"  edge:\n" +
+		"    address: \"tailnet-edge\"\n" +
 		"    overrides:\n" +
 		"      - {kind: prom_up, target: \":9090/-/ready\", path: /metrics, port: 9091}\n" +
-		"  lathe:\n" +
-		"    address: \"tailnet-lathe\"\n"))
+		"  lab:\n" +
+		"    address: \"tailnet-lab\"\n"))
 	if err != nil {
 		t.Fatalf("load overlay: %v", err)
 	}
@@ -205,12 +205,12 @@ func TestResolve(t *testing.T) {
 		t.Fatalf("resolve: %v", err)
 	}
 	want := map[string]Resolved{
-		"tower ts_reach":       {Address: "tailnet-tower", Port: 9101, Path: "", Target: ":9101"},
-		"tower lan_reach":      {Address: "lan-tower", Port: 22, Path: "", Target: ":22"},
-		"tower node_exporter":  {Address: "tailnet-tower", Port: 9102, Path: "/metrics", Target: ":9102/metrics"},
-		"tower kube_apiserver": {Address: "tailnet-tower", Port: 6443, Path: "", Target: ":6443"},
-		"box prom_up":          {Address: "tailnet-box", Port: 9091, Path: "/metrics", Target: ":9091/metrics"},
-		"lathe prom_up":        {Address: "tailnet-lathe", Port: 9090, Path: "/-/ready", Target: ":9090/-/ready"},
+		"spoke ts_reach":       {Address: "tailnet-spoke", Port: 9101, Path: "", Target: ":9101"},
+		"spoke lan_reach":      {Address: "lan-spoke", Port: 22, Path: "", Target: ":22"},
+		"spoke node_exporter":  {Address: "tailnet-spoke", Port: 9102, Path: "/metrics", Target: ":9102/metrics"},
+		"spoke kube_apiserver": {Address: "tailnet-spoke", Port: 6443, Path: "", Target: ":6443"},
+		"edge prom_up":         {Address: "tailnet-edge", Port: 9091, Path: "/metrics", Target: ":9091/metrics"},
+		"lab prom_up":          {Address: "tailnet-lab", Port: 9090, Path: "/-/ready", Target: ":9090/-/ready"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("want %d resolved checks, got %d: %+v", len(want), len(got), got)
@@ -229,7 +229,7 @@ func TestResolve(t *testing.T) {
 }
 
 func TestResolveMissingSlugs(t *testing.T) {
-	ov, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n  box:\n    address: \"tailnet-box\"\n"))
+	ov, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n  edge:\n    address: \"tailnet-edge\"\n"))
 	if err != nil {
 		t.Fatalf("load overlay: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestResolveMissingSlugs(t *testing.T) {
 		t.Fatalf("want a missing-slugs error, got %T %v", rerr, rerr)
 	}
 	// Every configured host without an entry is named, sorted.
-	if strings.Join(missing.Slugs, ",") != "lathe,tower" {
+	if strings.Join(missing.Slugs, ",") != "lab,spoke" {
 		t.Fatalf("missing slugs %v are not the unconfigured ones, sorted", missing.Slugs)
 	}
 }
@@ -250,9 +250,9 @@ func TestResolveRefusesDeniedPort(t *testing.T) {
 	// future refactor drops the load-time check. Resolve refuses it too,
 	// so no code path can turn a config into a dial of that port.
 	ov := &Overlay{Hosts: map[string]Host{
-		"tower": {Address: "tailnet-tower", Overrides: []Override{{Kind: contract.KindTSReach, Port: contract.DeniedPort, HasPort: true}}},
-		"box":   {Address: "tailnet-box"},
-		"lathe": {Address: "tailnet-lathe"},
+		"spoke": {Address: "tailnet-spoke", Overrides: []Override{{Kind: contract.KindTSReach, Port: contract.DeniedPort, HasPort: true}}},
+		"edge":  {Address: "tailnet-edge"},
+		"lab":   {Address: "tailnet-lab"},
 	}}
 	cfg := fixtureConfig(t)
 	_, rerr := ov.Resolve(cfg)
@@ -267,15 +267,15 @@ func TestResolveRefusesDeniedPort(t *testing.T) {
 
 func TestResolveLaterOverrideWins(t *testing.T) {
 	ov, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n" +
-		"  tower:\n" +
-		"    address: \"tailnet-tower\"\n" +
+		"  spoke:\n" +
+		"    address: \"tailnet-spoke\"\n" +
 		"    overrides:\n" +
 		"      - {kind: ts_reach, port: 9101}\n" +
 		"      - {kind: ts_reach, port: 9102}\n" +
-		"  box:\n" +
-		"    address: \"tailnet-box\"\n" +
-		"  lathe:\n" +
-		"    address: \"tailnet-lathe\"\n"))
+		"  edge:\n" +
+		"    address: \"tailnet-edge\"\n" +
+		"  lab:\n" +
+		"    address: \"tailnet-lab\"\n"))
 	if err != nil {
 		t.Fatalf("load overlay: %v", err)
 	}
@@ -291,8 +291,8 @@ func TestResolveLaterOverrideWins(t *testing.T) {
 
 func TestResolveTargetScopedOverrideOnlyMatchesItsTarget(t *testing.T) {
 	ov, _, err := parse([]byte("apiVersion: simplex.overlay/v0\nhosts:\n" +
-		"  tower:\n" +
-		"    address: \"tailnet-tower\"\n" +
+		"  spoke:\n" +
+		"    address: \"tailnet-spoke\"\n" +
 		"    overrides:\n" +
 		"      - {kind: prom_up, target: \":9091/-/ready\", path: /metrics}\n"))
 	if err != nil {
@@ -301,9 +301,9 @@ func TestResolveTargetScopedOverrideOnlyMatchesItsTarget(t *testing.T) {
 	cfg, _, perr := config.Parse([]byte(`
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: prom_up, expected: light}
       - {kind: prom_up, expected: light, port: 9091}

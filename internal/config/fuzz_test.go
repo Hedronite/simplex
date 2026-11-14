@@ -24,9 +24,9 @@ func seedInputs() [][]byte {
 		seeds = append(seeds, raw)
 	}
 	seeds = append(seeds,
-		[]byte(goodHeader+"hosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"),
-		[]byte("apiVersion: simplex.config/v0\nvantage: {id: lathe, canaries: [{host: tower, kind: ts_reach, target: \":9100\"}]}\nhosts: [{id: tower, checks: [{kind: ts_reach, expected: light}]}]\n"),
-		[]byte(goodHeader+"hosts: [{id: box, checks: [{kind: prom_up, expected: light, path: /-/healthy, port: 9091}]}]\nholds: [{host: \"*\", kind: \"*\", reason: x, until: \"2027-01-01T00:00:00Z\"}]\n"),
+		[]byte(goodHeader+"hosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"),
+		[]byte("apiVersion: simplex.config/v0\nvantage: {id: lab, canaries: [{host: spoke, kind: ts_reach, target: \":9100\"}]}\nhosts: [{id: spoke, checks: [{kind: ts_reach, expected: light}]}]\n"),
+		[]byte(goodHeader+"hosts: [{id: edge, checks: [{kind: prom_up, expected: light, path: /-/healthy, port: 9091}]}]\nholds: [{host: \"*\", kind: \"*\", reason: x, until: \"2027-01-01T00:00:00Z\"}]\n"),
 	)
 	return seeds
 }
