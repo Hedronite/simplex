@@ -7,11 +7,12 @@
 # candidate's artifacts unless the tag is forced or git ranks the candidate
 # below the final version. This puts both tags on one commit, built from the
 # working tree, and proves the final tag wins both when it is forced and when it
-# is only sorted. The sorted case repeats the workflow's own git setting, and
-# fails if the workflow has stopped making it.
+# is only sorted. The sorted case leans on the config alone with the global git
+# config switched off, so a setting on the machine cannot make it pass here and
+# fail somewhere else. It also fails if the workflow stops ranking prereleases.
 #
-# Needs goreleaser on PATH; writes nothing outside a temporary directory and
-# touches neither the network nor a release.
+# Needs goreleaser on PATH. It writes no git config, writes nothing outside a
+# temporary directory, and touches neither the network nor a release.
 set -eu
 
 fail() {
@@ -28,6 +29,11 @@ grep -q 'versionsort\.suffix -rc\.' .github/workflows/release.yml ||
 	fail "release.yml no longer ranks prerelease tags below their final version"
 version=0.0.1
 work=$(mktemp -d)
+# No global or system git config, so the config under test is the only thing
+# that can decide the tag.
+GIT_CONFIG_GLOBAL=/dev/null
+GIT_CONFIG_NOSYSTEM=1
+export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
 trap 'rm -rf "$work"' EXIT INT TERM
 
 # A repository built from the tracked tree, so the checkout's own tags cannot
@@ -41,7 +47,9 @@ git init -q .
 git remote add origin "https://github.com/${GITHUB_REPOSITORY:-Hedronite/simplex}.git"
 git config user.email "release-check"
 git config user.name "release check"
-git -C "$origin" archive HEAD | tar -x -C .
+# The working tree, not HEAD: the config under test is usually not committed
+# yet, and a fixture built from HEAD would test the old one.
+git -C "$origin" ls-files -z | rsync -a --from0 --files-from=- "$origin/" .
 git add -A
 git commit -q -m "fixture: one commit, two tags"
 git tag "v$version-rc.1"
@@ -68,9 +76,6 @@ GORELEASER_CURRENT_TAG="v$version" "$goreleaser" release --clean --skip=publish,
 if named_candidate; then fail "a run for v$version named an artifact after the candidate"; fi
 
 note "sorted, with nothing forced"
-# The value the workflow sets, repeated here so the sorted case is the one a
-# release without the forced tag would see.
-git config --global versionsort.suffix -rc.
 "$goreleaser" release --clean --skip=publish,sbom,sign >/dev/null
 [ "$(built_tag)" = "v$version" ] || fail "nothing forced, and the build carried $(built_tag)"
 if named_candidate; then fail "nothing forced, and an artifact was named after the candidate"; fi
