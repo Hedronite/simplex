@@ -18,3 +18,7 @@ overlay.json
 .DS_Store
 .idea/
 .vscode/
+
+# Environment files never ship.
+.env
+.env.*
