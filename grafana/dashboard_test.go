@@ -9,6 +9,7 @@ package grafana_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,7 +28,11 @@ const (
 	providerFile  = "provisioning/dashboards/simplex.yaml"
 	dashboardUID  = "simplex"
 	dashboardTitl = "Simplex mesh health"
-	promUID       = "lea-prom"
+	// dsVariable is the one datasource reference the dashboard may carry: the
+	// template variable that lets the person who imports it choose the
+	// Prometheus instance. No datasource uid is written into the file.
+	dsVariable     = "${datasource}"
+	dsVariableName = "datasource"
 )
 
 // TestDashboardParsesStrictly decodes the file once, rejects trailing
@@ -74,10 +79,13 @@ func TestDashboardParsesStrictly(t *testing.T) {
 	}
 }
 
-// TestDatasourcesAreExactlyLeaProm walks every panel and every variable:
-// the datasource must be exactly the shared Prometheus datasource, and no
-// other uid appears anywhere in the file except the dashboard's own.
-func TestDatasourcesAreExactlyLeaProm(t *testing.T) {
+// TestDatasourceIsTheTemplateVariable walks every panel, every target and every
+// query variable: the datasource must be exactly the template variable, and no
+// other uid appears anywhere in the file except the dashboard's own. The
+// variable itself must be a Prometheus datasource picker that starts on the
+// instance default, so an import works on a Grafana whose datasource has any
+// uid and needs no edit of the file.
+func TestDatasourceIsTheTemplateVariable(t *testing.T) {
 	raw := readRepoFile(t, dashboardFile)
 	var root map[string]any
 	if err := json.Unmarshal(raw, &root); err != nil {
@@ -86,26 +94,55 @@ func TestDatasourcesAreExactlyLeaProm(t *testing.T) {
 	panels, _ := root["panels"].([]any)
 	for i, p := range panels {
 		assertDatasource(t, "panel", i, p)
+		pm, _ := p.(map[string]any)
+		targets, _ := pm["targets"].([]any)
+		for j, tg := range targets {
+			assertDatasource(t, fmt.Sprintf("panel %d target", i), j, tg)
+		}
 	}
-	if tpl, ok := root["templating"].(map[string]any); ok {
-		vars, _ := tpl["list"].([]any)
-		for i, v := range vars {
-			vm, _ := v.(map[string]any)
-			if name, _ := vm["name"].(string); name == "" {
-				continue
+
+	tpl, ok := root["templating"].(map[string]any)
+	if !ok {
+		t.Fatal("dashboard has no templating")
+	}
+	vars, _ := tpl["list"].([]any)
+	found := false
+	for i, v := range vars {
+		vm, _ := v.(map[string]any)
+		name, _ := vm["name"].(string)
+		switch qtype, _ := vm["type"].(string); qtype {
+		case "datasource":
+			if name != dsVariableName {
+				t.Fatalf("datasource variable is named %q, want %q", name, dsVariableName)
 			}
-			if qtype, _ := vm["type"].(string); qtype != "query" {
-				continue
+			if q, _ := vm["query"].(string); q != "prometheus" {
+				t.Fatalf("datasource variable query %q, want prometheus", q)
 			}
+			cur, _ := vm["current"].(map[string]any)
+			if val, _ := cur["value"].(string); val != "default" {
+				t.Fatalf("datasource variable starts on %q, want the instance default", val)
+			}
+			if multi, _ := vm["multi"].(bool); multi {
+				t.Fatal("datasource variable must pick exactly one datasource")
+			}
+			if all, _ := vm["includeAll"].(bool); all {
+				t.Fatal("datasource variable must not offer All")
+			}
+			found = true
+		case "query":
 			assertDatasource(t, "variable", i, v)
 		}
 	}
+	if !found {
+		t.Fatalf("no %q datasource variable in the dashboard", dsVariableName)
+	}
+
 	uidPattern := regexp.MustCompile(`"uid"\s*:\s*"([^"]+)"`)
 	for _, m := range uidPattern.FindAllStringSubmatch(string(raw), -1) {
 		switch m[1] {
-		case promUID, dashboardUID:
+		case dsVariable, dashboardUID:
 		default:
-			t.Fatalf("uid %q in the dashboard is neither %q nor the dashboard uid", m[1], promUID)
+			t.Fatalf("uid %q in the dashboard is neither the datasource variable %q nor the dashboard uid", m[1], dsVariable)
 		}
 	}
 }
@@ -123,8 +160,8 @@ func assertDatasource(t *testing.T, what string, i int, panel any) {
 	if got, _ := ds["type"].(string); got != "prometheus" {
 		t.Fatalf("%s %d datasource type %q, want prometheus", what, i, got)
 	}
-	if got, _ := ds["uid"].(string); got != promUID {
-		t.Fatalf("%s %d datasource uid %q, want %q", what, i, got, promUID)
+	if got, _ := ds["uid"].(string); got != dsVariable {
+		t.Fatalf("%s %d datasource uid %q, want the variable %q", what, i, got, dsVariable)
 	}
 }
 
