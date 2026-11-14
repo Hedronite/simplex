@@ -12,9 +12,9 @@ import (
 // shapes plus the ones the agreement corpus exercises.
 func seedInputs() [][]byte {
 	seeds := [][]byte{
-		[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n"),
-		[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"tailnet-tower\"\n    lan_address: \"lan-tower\"\n    overrides:\n      - {kind: ts_reach, port: 9101}\n"),
-		[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  box:\n    address: \"tailnet-box\"\n    overrides:\n      - {kind: prom_up, target: \":9090/-/ready\", path: /metrics, port: 9091}\n"),
+		[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n"),
+		[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"tailnet-spoke\"\n    lan_address: \"lan-spoke\"\n    overrides:\n      - {kind: ts_reach, port: 9101}\n"),
+		[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  edge:\n    address: \"tailnet-edge\"\n    overrides:\n      - {kind: prom_up, target: \":9090/-/ready\", path: /metrics, port: 9091}\n"),
 		[]byte("apiVersion: simplex.overlay/v0\nhosts: {}\n"),
 		[]byte(""),
 	}

@@ -173,7 +173,7 @@ func TestFixturesReproduceThroughCheck(t *testing.T) {
 			if !exitcode.WritesDocument(wantCode) {
 				// Error cases: no document, exactly one error line.
 				deps := &Deps{Runner: probe.New(&probe.Options{
-					Dialer: fakeDialer{plans: map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}},
+					Dialer: fakeDialer{plans: map[string]plan{"spoke.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}},
 					Clock:  instantClock{},
 				}), Lister: fakeLister(true), Now: time.Now, Getenv: func(string) string { return "" }}
 				args := []string{"check", "--json", "--config", cfgPath, "--overlay", ovPath, "--now", "2026-11-13T18:00:00Z"}
@@ -218,10 +218,10 @@ func tinyFiles(t *testing.T) (cfg, ov string) {
 	dir := t.TempDir()
 	cfg = filepath.Join(dir, "c.yaml")
 	ov = filepath.Join(dir, "o.txt")
-	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: tower.invalid\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: spoke.invalid\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return cfg, ov
@@ -229,7 +229,7 @@ func tinyFiles(t *testing.T) (cfg, ov string) {
 
 func upDeps() *Deps {
 	return &Deps{
-		Runner: fakeRunner(map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}),
+		Runner: fakeRunner(map[string]plan{"spoke.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}),
 		Lister: fakeLister(true),
 		Now:    func() time.Time { return time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC) },
 		Getenv: func(string) string { return "" },
@@ -281,7 +281,7 @@ func TestMissingOverlayFailsClosedNamingSlugs(t *testing.T) {
 	cfg, _ := tinyFiles(t)
 	t.Chdir(t.TempDir())
 	r := invoke(t, upDeps(), "check", "--json", "--config", cfg)
-	if r.code != exitcode.Config || !strings.Contains(r.stderr, "tower") || r.stdout != "" {
+	if r.code != exitcode.Config || !strings.Contains(r.stderr, "spoke") || r.stdout != "" {
 		t.Fatalf("exit %d stdout %q stderr %q", r.code, r.stdout, r.stderr)
 	}
 }
@@ -376,14 +376,14 @@ func TestConfigCanariesDriveTheVantage(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "c.yaml")
 	ov := filepath.Join(dir, "o.txt")
-	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\n  canaries:\n    - {host: tower, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lab\n  canaries:\n    - {host: spoke, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: tower.invalid\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: spoke.invalid\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	answering := map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}
-	silent := map[string]plan{"tower.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUnknown, outcome: contract.ReasonTCPConnectTimeout}}
+	answering := map[string]plan{"spoke.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUp, outcome: contract.ReasonTCPConnectOK}}
+	silent := map[string]plan{"spoke.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUnknown, outcome: contract.ReasonTCPConnectTimeout}}
 	for name, tc := range map[string]struct {
 		plans  map[string]plan
 		lister bool
@@ -432,10 +432,10 @@ func TestRealDialerAgainstALoopbackListener(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "c.yaml")
 	ov := filepath.Join(dir, "o.txt")
-	if err := os.WriteFile(cfg, []byte(fmt.Sprintf("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light, port: %d}\n", port)), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte(fmt.Sprintf("apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light, port: %d}\n", port)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: 127.0.0.1\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: 127.0.0.1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	deps := &Deps{

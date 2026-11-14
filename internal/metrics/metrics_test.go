@@ -438,10 +438,10 @@ func TestSentinelNeverEchoed(t *testing.T) {
 		GeneratedAt: goldenNow.Add(-time.Minute).Format(time.RFC3339),
 		Vantage:     document.Vantage{ID: sentinel, Status: contract.VantageOK},
 		Overall:     contract.SeverityYellow,
-		Hosts:       []document.Host{{ID: "box", Severity: contract.SeverityYellow}},
+		Hosts:       []document.Host{{ID: "edge", Severity: contract.SeverityYellow}},
 		Checks: []document.Check{
 			{
-				Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready",
+				Host: "edge", Kind: contract.KindPromUp, Target: ":9090/-/ready",
 				Result: contract.ResultDown, Severity: contract.SeverityYellow,
 				Expected: contract.ExpectedLight,
 				// A code the contract does not know: the encoder emits reasons
@@ -449,7 +449,7 @@ func TestSentinelNeverEchoed(t *testing.T) {
 				Reasons: []contract.Reason{sentinelReason},
 			},
 			{
-				Host: "box", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+				Host: "edge", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
 				Result: contract.ResultDown, Severity: contract.SeverityYellow,
 				Expected: contract.ExpectedLight,
 				// A known code, which must read 1 while the rest read 0.

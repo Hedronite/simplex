@@ -217,47 +217,47 @@ var negativeCases = []struct {
 }{
 	{"config", "no_checks_at_all", `{
   "apiVersion": "simplex.config/v0",
-  "vantage": {"id": "lathe"},
-  "hosts": [{"id": "tower"}]
+  "vantage": {"id": "lab"},
+  "hosts": [{"id": "spoke"}]
 }`},
 	{"config", "path_on_a_tcp_kind", `{
   "apiVersion": "simplex.config/v0",
-  "vantage": {"id": "lathe"},
-  "hosts": [{"id": "tower", "checks": [{"kind": "ts_reach", "expected": "light", "path": "/metrics"}]}]
+  "vantage": {"id": "lab"},
+  "hosts": [{"id": "spoke", "checks": [{"kind": "ts_reach", "expected": "light", "path": "/metrics"}]}]
 }`},
 	{"config", "host_with_empty_checks", `{
   "apiVersion": "simplex.config/v0",
-  "vantage": {"id": "lathe"},
-  "hosts": [{"id": "tower", "checks": []}, {"id": "box", "checks": [{"kind": "prom_up", "expected": "light"}]}]
+  "vantage": {"id": "lab"},
+  "hosts": [{"id": "spoke", "checks": []}, {"id": "edge", "checks": [{"kind": "prom_up", "expected": "light"}]}]
 }`},
 	{"overlay", "path_on_a_tcp_kind", `{
   "apiVersion": "simplex.overlay/v0",
-  "hosts": {"tower": {"address": "placeholder.invalid", "overrides": [{"kind": "ts_reach", "path": "/metrics"}]}}
+  "hosts": {"spoke": {"address": "placeholder.invalid", "overrides": [{"kind": "ts_reach", "path": "/metrics"}]}}
 }`},
 	{"probe", "empty_hosts", `{
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "ok"},
+  "vantage": {"id": "lab", "status": "ok"},
   "overall": "GREEN",
   "hosts": [],
-  "checks": [{"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
               "severity": "GREEN", "expected": "light", "reasons": []}]
 }`},
 	{"probe", "empty_checks", `{
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "ok"},
+  "vantage": {"id": "lab", "status": "ok"},
   "overall": "GREEN",
-  "hosts": [{"id": "tower", "severity": "GREEN", "reasons": []}],
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
   "checks": []
 }`},
 	{"config", "canary_of_wrong_kind", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "prom_up",
         "target": ":9100"
       }
@@ -265,7 +265,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -278,7 +278,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -303,10 +303,10 @@ var negativeCases = []struct {
 	{"config", "check_missing_expected", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -314,7 +314,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -330,7 +330,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -355,10 +355,10 @@ var negativeCases = []struct {
 	{"config", "denylisted_port", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -366,7 +366,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -384,7 +384,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -409,10 +409,10 @@ var negativeCases = []struct {
 	{"config", "empty_hosts", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -431,10 +431,10 @@ var negativeCases = []struct {
 	{"config", "hold_without_reason", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -442,7 +442,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -455,7 +455,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -479,10 +479,10 @@ var negativeCases = []struct {
 	{"config", "hold_without_until", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -490,7 +490,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -503,7 +503,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -527,10 +527,10 @@ var negativeCases = []struct {
 	{"config", "host_without_id", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -538,7 +538,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -551,7 +551,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -580,7 +580,7 @@ var negativeCases = []struct {
   "apiVersion": "simplex.config/v0",
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -593,7 +593,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -618,10 +618,10 @@ var negativeCases = []struct {
 	{"config", "path_outside_allowlist", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -629,7 +629,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -642,7 +642,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -667,10 +667,10 @@ var negativeCases = []struct {
 	{"config", "unknown_key", `{
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -678,7 +678,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -691,7 +691,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -717,10 +717,10 @@ var negativeCases = []struct {
 	{"config", "unknown_major", `{
   "apiVersion": "simplex.config/v9",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -728,7 +728,7 @@ var negativeCases = []struct {
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -741,7 +741,7 @@ var negativeCases = []struct {
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",
@@ -767,13 +767,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -783,7 +783,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -799,13 +799,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -815,7 +815,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -834,19 +834,19 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW"
     }
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -862,13 +862,13 @@ var negativeCases = []struct {
 	{"probe", "missing_api_version", `{
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -878,7 +878,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -895,13 +895,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -911,9 +911,9 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
-      "target": "box:9090",
+      "target": "edge:9090",
       "result": "down",
       "severity": "YELLOW",
       "expected": "light",
@@ -928,13 +928,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00-05:00",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -944,7 +944,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -961,13 +961,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -977,7 +977,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -995,13 +995,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -1011,7 +1011,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "ping",
       "target": ":9090/-/ready",
       "result": "down",
@@ -1028,13 +1028,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -1044,7 +1044,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -1062,13 +1062,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "down"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -1078,7 +1078,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -1095,13 +1095,13 @@ var negativeCases = []struct {
   "apiVersion": "simplex.probe/v1",
   "generated_at": "2026-11-13T18:00:00Z",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "status": "ok"
   },
   "overall": "YELLOW",
   "hosts": [
     {
-      "id": "box",
+      "id": "edge",
       "severity": "YELLOW",
       "reasons": [
         "http_unexpected_status",
@@ -1111,7 +1111,7 @@ var negativeCases = []struct {
   ],
   "checks": [
     {
-      "host": "box",
+      "host": "edge",
       "kind": "prom_up",
       "target": ":9090/-/ready",
       "result": "down",
@@ -1153,10 +1153,10 @@ func TestProbeDocumentAllowsEmptyReasonArrays(t *testing.T) {
 	doc, err := jsonschema.UnmarshalJSON(strings.NewReader(`{
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "ok"},
+  "vantage": {"id": "lab", "status": "ok"},
   "overall": "GREEN",
-  "hosts": [{"id": "tower", "severity": "GREEN", "reasons": []}],
-  "checks": [{"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
               "severity": "GREEN", "expected": "light", "reasons": []}]
 }`))
 	if err != nil {
@@ -1173,10 +1173,10 @@ func TestBlindDocumentShape(t *testing.T) {
 	doc, err := jsonschema.UnmarshalJSON(strings.NewReader(`{
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "blind"},
+  "vantage": {"id": "lab", "status": "blind"},
   "overall": "RED",
-  "hosts": [{"id": "tower", "severity": "RED", "reasons": ["vantage_blind"]}],
-  "checks": [{"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "unknown",
+  "hosts": [{"id": "spoke", "severity": "RED", "reasons": ["vantage_blind"]}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "unknown",
               "severity": "RED", "expected": "light", "reasons": ["vantage_blind"]}]
 }`))
 	if err != nil {

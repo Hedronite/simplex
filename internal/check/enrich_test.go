@@ -22,7 +22,7 @@ import (
 // None of them may reach a document, a warning or an error.
 var leakLiterals = []string{
 	"192.0.2.20", "198.51.100.5", "198.51.100.99", "203.0.113.7",
-	"tower.tail.example", "secret-host.example", "nodekey:leakkey0001", "user-leak-0001",
+	"spoke.tail.example", "secret-host.example", "nodekey:leakkey0001", "user-leak-0001",
 }
 
 type fakeLocalAPI struct {
@@ -92,14 +92,14 @@ type lister bool
 func (l lister) HasTailnetAddress() bool { return bool(l) }
 
 func enrichConfig(block string) string {
-	return "apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n      - {kind: kube_apiserver, expected: light}\n" + block
+	return "apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n      - {kind: kube_apiserver, expected: light}\n" + block
 }
 
 func runEnriched(t *testing.T, block string, socket string, tailnet bool) (*Result, error) {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := write(t, dir, "c.yaml", enrichConfig(block))
-	ov := write(t, dir, "o.txt", "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: 192.0.2.20\n")
+	ov := write(t, dir, "o.txt", "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: 192.0.2.20\n")
 	d := &Deps{
 		Runner:          probe.New(&probe.Options{Dialer: acceptDialer{}, Clock: instantClock{}}),
 		Lister:          lister(tailnet),
@@ -142,13 +142,13 @@ func TestEnrichmentCodesFromTheDaemon(t *testing.T) {
 		peers string
 		want  []contract.Reason
 	}{
-		"online and direct": {peer("192.0.2.20", "tower.tail.example.", true, "198.51.100.5:41641", ""),
+		"online and direct": {peer("192.0.2.20", "spoke.tail.example.", true, "198.51.100.5:41641", ""),
 			[]contract.Reason{"tcp_connect_ok", "ts_path_direct", "ts_peer_online"}},
-		"online and relayed": {peer("192.0.2.20", "tower.tail.example.", true, "", "mia"),
+		"online and relayed": {peer("192.0.2.20", "spoke.tail.example.", true, "", "mia"),
 			[]contract.Reason{"tcp_connect_ok", "ts_path_relayed", "ts_peer_online"}},
-		"offline with no path": {peer("192.0.2.20", "tower.tail.example.", false, "", ""),
+		"offline with no path": {peer("192.0.2.20", "spoke.tail.example.", false, "", ""),
 			[]contract.Reason{"tcp_connect_ok", "ts_peer_offline"}},
-		"offline but relayed": {peer("192.0.2.20", "tower.tail.example.", false, "", "mia"),
+		"offline but relayed": {peer("192.0.2.20", "spoke.tail.example.", false, "", "mia"),
 			[]contract.Reason{"tcp_connect_ok", "ts_path_relayed", "ts_peer_offline"}},
 		"not in the list": {peer("198.51.100.5", "other.tail.example.", true, "198.51.100.5:1", ""),
 			[]contract.Reason{"tcp_connect_ok", "ts_peer_unmatched"}},
@@ -189,7 +189,7 @@ func TestEnrichmentIsSilentForTheVantageItself(t *testing.T) {
 	// The overlay address is the vantage's own tailnet address.
 	dir := t.TempDir()
 	cfg := write(t, dir, "c.yaml", enrichConfig(onBlock))
-	ov := write(t, dir, "o.txt", "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: 203.0.113.7\n")
+	ov := write(t, dir, "o.txt", "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: 203.0.113.7\n")
 	res, err := Run(context.Background(), &Params{Config: cfg, Overlay: ov, Now: runNow}, &Deps{
 		Runner: probe.New(&probe.Options{Dialer: acceptDialer{}, Clock: instantClock{}}),
 		Lister: lister(true), Getenv: func(string) string { return "" }, TailscaleSocket: api.socket,
@@ -203,7 +203,7 @@ func TestEnrichmentIsSilentForTheVantageItself(t *testing.T) {
 }
 
 func TestEnrichmentOffMeansNoRequest(t *testing.T) {
-	api := startLocalAPI(t, 200, statusBody(peer("192.0.2.20", "tower.tail.example.", true, "x:1", "")))
+	api := startLocalAPI(t, 200, statusBody(peer("192.0.2.20", "spoke.tail.example.", true, "x:1", "")))
 	for name, block := range map[string]string{"no block": "", "localapi false": "tailscale:\n  localapi: false\n"} {
 		t.Run(name, func(t *testing.T) {
 			before := api.requests.Load()
@@ -222,7 +222,7 @@ func TestEnrichmentOffMeansNoRequest(t *testing.T) {
 }
 
 func TestBlindVantageMakesNoRequestAndCarriesNoCodes(t *testing.T) {
-	api := startLocalAPI(t, 200, statusBody(peer("192.0.2.20", "tower.tail.example.", true, "x:1", "")))
+	api := startLocalAPI(t, 200, statusBody(peer("192.0.2.20", "spoke.tail.example.", true, "x:1", "")))
 	res, err := runEnriched(t, onBlock, api.socket, false)
 	if err != nil {
 		t.Fatal(err)

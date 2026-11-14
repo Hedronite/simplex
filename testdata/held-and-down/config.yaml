@@ -1,12 +1,12 @@
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: box
+  - id: edge
     checks:
       - {kind: node_exporter, expected: light}
 holds:
-  - host: box
+  - host: edge
     kind: node_exporter
     reason: exporter migration
     until: "2027-01-01T00:00:00Z"

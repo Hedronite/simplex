@@ -13,7 +13,7 @@ func docWith(checks []document.Check) *document.Document {
 	return &document.Document{
 		APIVersion:  contract.ProbeAPIVersion,
 		GeneratedAt: "2026-11-13T18:00:00Z",
-		Vantage:     document.Vantage{ID: "lathe", Status: contract.VantageOK},
+		Vantage:     document.Vantage{ID: "lab", Status: contract.VantageOK},
 		Overall:     contract.SeverityYellow,
 		Checks:      checks,
 	}
@@ -21,16 +21,16 @@ func docWith(checks []document.Check) *document.Document {
 
 func TestRenderGolden(t *testing.T) {
 	d := docWith([]document.Check{
-		{Host: "box", Kind: contract.KindPromUp, Target: ":9090",
+		{Host: "edge", Kind: contract.KindPromUp, Target: ":9090",
 			Result: contract.ResultUp, Severity: contract.SeverityGreen, Expected: contract.ExpectedLight},
-		{Host: "lathe", Kind: contract.KindKubeAPIServer, Target: ":6443",
+		{Host: "lab", Kind: contract.KindKubeAPIServer, Target: ":6443",
 			Result: contract.ResultDown, Severity: contract.SeverityRed, Expected: contract.ExpectedDark,
 			Reasons: []contract.Reason{contract.ReasonUnexpectedDark}},
 	})
 	want := "" +
-		"HOST   CHECK                 EXPECTED  RESULT  SEVERITY  REASONS\n" +
-		"box    prom_up :9090         light     up      GREEN\n" +
-		"lathe  kube_apiserver :6443  dark      down    RED       unexpected_dark\n"
+		"HOST  CHECK                 EXPECTED  RESULT  SEVERITY  REASONS\n" +
+		"edge  prom_up :9090         light     up      GREEN\n" +
+		"lab   kube_apiserver :6443  dark      down    RED       unexpected_dark\n"
 	if got := Render(d, false); got != want {
 		t.Fatalf("golden table differs\n--- got\n%s--- want\n%s", quoteLines(got), quoteLines(want))
 	}
@@ -51,7 +51,7 @@ func TestRenderReasonsTruncateToWholeCodes(t *testing.T) {
 		contract.ReasonPromAuth, contract.ReasonMetricsBodyBad,
 	}
 	d := docWith([]document.Check{{
-		Host: "tower", Kind: contract.KindTSReach, Target: ":9100",
+		Host: "spoke", Kind: contract.KindTSReach, Target: ":9100",
 		Result: contract.ResultUnknown, Severity: contract.SeverityYellow, Expected: contract.ExpectedLight,
 		Reasons: reasons,
 	}})
@@ -66,7 +66,7 @@ func TestRenderReasonsTruncateToWholeCodes(t *testing.T) {
 
 func TestRenderColorPaintsOnlySeverity(t *testing.T) {
 	d := docWith([]document.Check{{
-		Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready",
+		Host: "edge", Kind: contract.KindPromUp, Target: ":9090/-/ready",
 		Result: contract.ResultDown, Severity: contract.SeverityYellow, Expected: contract.ExpectedLight,
 		Reasons: []contract.Reason{contract.ReasonUnexpectedDark},
 	}})
@@ -91,7 +91,7 @@ func stripEscapes(s string) string {
 
 func TestRenderHeldRowKeepsResultAndReason(t *testing.T) {
 	d := docWith([]document.Check{{
-		Host: "tower", Kind: contract.KindTSReach, Target: ":9100",
+		Host: "spoke", Kind: contract.KindTSReach, Target: ":9100",
 		Result: contract.ResultDown, Severity: contract.SeverityGreen, Expected: contract.ExpectedLight,
 		Reasons: []contract.Reason{contract.ReasonHeld, contract.ReasonTCPConnectRefused},
 	}})
@@ -109,9 +109,9 @@ func TestRenderHeldRowKeepsResultAndReason(t *testing.T) {
 
 func TestRenderDeterministicAndColumnAligned(t *testing.T) {
 	d := docWith([]document.Check{
-		{Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready",
+		{Host: "edge", Kind: contract.KindPromUp, Target: ":9090/-/ready",
 			Result: contract.ResultUp, Severity: contract.SeverityGreen, Expected: contract.ExpectedLight},
-		{Host: "lathe", Kind: contract.KindKubeAPIServer, Target: ":6443",
+		{Host: "lab", Kind: contract.KindKubeAPIServer, Target: ":6443",
 			Result: contract.ResultDown, Severity: contract.SeverityRed, Expected: contract.ExpectedDark,
 			Reasons: []contract.Reason{contract.ReasonUnexpectedDark}},
 	})

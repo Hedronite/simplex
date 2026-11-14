@@ -24,7 +24,7 @@ func FuzzDecodeStatus(f *testing.F) {
 		}
 		// Whatever it decoded, a lookup must be safe and a key must never be
 		// empty: an empty key would match any empty address.
-		for _, probe := range []string{"", "192.0.2.10", "tower.example."} {
+		for _, probe := range []string{"", "192.0.2.10", "spoke.example."} {
 			_, _ = status.Match(probe)
 		}
 		if _, ok := status.Match(""); ok {

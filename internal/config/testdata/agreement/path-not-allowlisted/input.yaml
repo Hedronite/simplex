@@ -1,7 +1,7 @@
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: box
+  - id: edge
     checks:
       - {kind: prom_up, expected: light, path: /debug}

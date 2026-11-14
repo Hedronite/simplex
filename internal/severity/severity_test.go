@@ -129,7 +129,7 @@ func obs(host string, kind contract.Kind, expected contract.Expected, result con
 
 func eval(t *testing.T, status contract.VantageStatus, holds []Hold, checks ...Observation) document.Document {
 	t.Helper()
-	d, err := Evaluate(&Input{Now: fixtureNow, VantageID: "lathe", VantageStatus: status, Holds: holds, Checks: checks})
+	d, err := Evaluate(&Input{Now: fixtureNow, VantageID: "lab", VantageStatus: status, Holds: holds, Checks: checks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,9 +181,9 @@ func TestUnknownNeverRedAlone(t *testing.T) {
 func TestBlindIsTerminal(t *testing.T) {
 	held := []Hold{{Host: "*", Kind: "*", Reason: "x", Until: fixtureNow.Add(time.Hour)}}
 	d := eval(t, contract.VantageBlind, held,
-		obs("box", contract.KindPromUp, contract.ExpectedLight, contract.ResultUp, ""),
-		obs("lathe", contract.KindPromUp, contract.ExpectedLight, contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
-		obs("tower", contract.KindKubeAPIServer, contract.ExpectedDark, contract.ResultDown, contract.ReasonTCPConnectRefused))
+		obs("edge", contract.KindPromUp, contract.ExpectedLight, contract.ResultUp, ""),
+		obs("lab", contract.KindPromUp, contract.ExpectedLight, contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
+		obs("spoke", contract.KindKubeAPIServer, contract.ExpectedDark, contract.ResultDown, contract.ReasonTCPConnectRefused))
 	for _, c := range d.Checks {
 		if c.Result != contract.ResultUnknown || c.Severity != contract.SeverityRed ||
 			!slices.Equal(c.Reasons, []contract.Reason{contract.ReasonVantageBlind}) {
@@ -207,8 +207,8 @@ func TestPairPass(t *testing.T) {
 	}
 	t.Run("both down is RED and the pair code is added", func(t *testing.T) {
 		d := eval(t, contract.VantageOK, nil,
-			p("box", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
-			p("lathe", contract.ResultUnknown, contract.ReasonHTTPTimeout))
+			p("edge", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
+			p("lab", contract.ResultUnknown, contract.ReasonHTTPTimeout))
 		for _, c := range d.Checks {
 			if c.Severity != contract.SeverityRed || !slices.Contains(c.Reasons, contract.ReasonPromPairDown) {
 				t.Fatalf("not RED pair: %+v", c)
@@ -224,25 +224,25 @@ func TestPairPass(t *testing.T) {
 	})
 	t.Run("one down is YELLOW degraded", func(t *testing.T) {
 		d := eval(t, contract.VantageOK, nil,
-			p("box", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
-			p("lathe", contract.ResultUp, ""))
+			p("edge", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
+			p("lab", contract.ResultUp, ""))
 		if d.Checks[0].Severity != contract.SeverityYellow || !slices.Contains(d.Checks[0].Reasons, contract.ReasonPromPairDegrade) ||
 			d.Checks[1].Severity != contract.SeverityGreen {
 			t.Fatalf("%+v", d.Checks)
 		}
 	})
 	t.Run("a single prom check never fires the pair", func(t *testing.T) {
-		d := eval(t, contract.VantageOK, nil, p("box", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus))
+		d := eval(t, contract.VantageOK, nil, p("edge", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus))
 		if d.Checks[0].Severity != contract.SeverityYellow || slices.Contains(d.Checks[0].Reasons, contract.ReasonPromPairDown) ||
 			slices.Contains(d.Checks[0].Reasons, contract.ReasonPromPairDegrade) {
 			t.Fatalf("%+v", d.Checks[0])
 		}
 	})
 	t.Run("a held member leaves the pair, so the survivor is YELLOW not RED", func(t *testing.T) {
-		held := []Hold{{Host: "box", Kind: "prom_up", Reason: "x", Until: fixtureNow.Add(time.Hour)}}
+		held := []Hold{{Host: "edge", Kind: "prom_up", Reason: "x", Until: fixtureNow.Add(time.Hour)}}
 		d := eval(t, contract.VantageOK, held,
-			p("box", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
-			p("lathe", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus))
+			p("edge", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus),
+			p("lab", contract.ResultDown, contract.ReasonHTTPUnexpectedStatus))
 		if d.Checks[0].Severity != contract.SeverityGreen || d.Checks[1].Severity != contract.SeverityYellow ||
 			slices.Contains(d.Checks[1].Reasons, contract.ReasonPromPairDown) {
 			t.Fatalf("%+v", d.Checks)
@@ -250,7 +250,7 @@ func TestPairPass(t *testing.T) {
 	})
 	t.Run("two up with a prom_not_ready stays plain YELLOW", func(t *testing.T) {
 		d := eval(t, contract.VantageOK, nil,
-			p("box", contract.ResultUp, contract.ReasonPromNotReady), p("lathe", contract.ResultUp, ""))
+			p("edge", contract.ResultUp, contract.ReasonPromNotReady), p("lab", contract.ResultUp, ""))
 		if d.Checks[0].Severity != contract.SeverityYellow || slices.Contains(d.Checks[0].Reasons, contract.ReasonPromPairDegrade) {
 			t.Fatalf("%+v", d.Checks[0])
 		}
@@ -258,19 +258,19 @@ func TestPairPass(t *testing.T) {
 }
 
 func TestHoldWindow(t *testing.T) {
-	o := obs("tower", contract.KindTSReach, contract.ExpectedLight, contract.ResultDown, contract.ReasonTCPConnectTimeout)
+	o := obs("spoke", contract.KindTSReach, contract.ExpectedLight, contract.ResultDown, contract.ReasonTCPConnectTimeout)
 	for _, tc := range []struct {
 		name  string
 		hold  Hold
 		heldN bool
 	}{
-		{"future", Hold{Host: "tower", Kind: "ts_reach", Until: fixtureNow.Add(time.Second)}, true},
-		{"until equals now is expired", Hold{Host: "tower", Kind: "ts_reach", Until: fixtureNow}, false},
-		{"past", Hold{Host: "tower", Kind: "ts_reach", Until: fixtureNow.Add(-time.Hour)}, false},
+		{"future", Hold{Host: "spoke", Kind: "ts_reach", Until: fixtureNow.Add(time.Second)}, true},
+		{"until equals now is expired", Hold{Host: "spoke", Kind: "ts_reach", Until: fixtureNow}, false},
+		{"past", Hold{Host: "spoke", Kind: "ts_reach", Until: fixtureNow.Add(-time.Hour)}, false},
 		{"host wildcard", Hold{Host: "*", Kind: "ts_reach", Until: fixtureNow.Add(time.Hour)}, true},
-		{"kind wildcard", Hold{Host: "tower", Kind: "*", Until: fixtureNow.Add(time.Hour)}, true},
-		{"other host", Hold{Host: "box", Kind: "ts_reach", Until: fixtureNow.Add(time.Hour)}, false},
-		{"other kind", Hold{Host: "tower", Kind: "prom_up", Until: fixtureNow.Add(time.Hour)}, false},
+		{"kind wildcard", Hold{Host: "spoke", Kind: "*", Until: fixtureNow.Add(time.Hour)}, true},
+		{"other host", Hold{Host: "edge", Kind: "ts_reach", Until: fixtureNow.Add(time.Hour)}, false},
+		{"other kind", Hold{Host: "spoke", Kind: "prom_up", Until: fixtureNow.Add(time.Hour)}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := eval(t, contract.VantageOK, []Hold{tc.hold}, o).Checks[0]
@@ -315,9 +315,9 @@ func TestInvariantsOverRandomInputs(t *testing.T) {
 	for n := 0; n < 500; n++ {
 		var in Input
 		in.Now = fixtureNow
-		in.VantageID = "lathe"
+		in.VantageID = "lab"
 		in.VantageStatus = []contract.VantageStatus{"ok", "ok", "ok", "unchecked", "blind"}[rng.Intn(5)]
-		hosts := []string{"apiary", "box", "castle", "lathe", "tower"}
+		hosts := []string{"core", "edge", "hub", "lab", "spoke"}
 		seen := map[string]bool{}
 		for i := 0; i < 1+rng.Intn(10); i++ {
 			o := Observation{

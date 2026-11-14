@@ -23,7 +23,7 @@ import (
 // Sentinels are reserved documentation values written as plain literals.
 const (
 	sentinelAddr = "192.0.2.55"
-	sentinelHost = "box.tail.example"
+	sentinelHost = "edge.tail.example"
 )
 
 type syncBuffer struct {
@@ -131,10 +131,10 @@ func serveFiles(t *testing.T, addr string) (cfg, ov string) {
 	dir := t.TempDir()
 	cfg = filepath.Join(dir, "c.yaml")
 	ov = filepath.Join(dir, "o.txt")
-	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: "+addr+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: "+addr+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return cfg, ov
@@ -228,7 +228,7 @@ func TestServeUnsafeFlagAllowsAndWarnsOnEveryStart(t *testing.T) {
 func TestServeStartupErrorsExitBeforeListening(t *testing.T) {
 	cfg, ov := serveFiles(t, sentinelAddr)
 	bad := filepath.Join(t.TempDir(), "bad.yaml")
-	if err := os.WriteFile(bad, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\n  canaries:\n    - {host: ghost, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+	if err := os.WriteFile(bad, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lab\n  canaries:\n    - {host: ghost, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for name, args := range map[string][]string{
@@ -378,7 +378,7 @@ func TestServeFailureAfterStartupIsCountedAndNonFatal(t *testing.T) {
 		return strings.Contains(b, "simplex_last_run_timestamp_seconds ")
 	})
 	// Break the overlay with a key that is a value, so the journal could leak it.
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\n"+sentinelAddr+": x\nhosts:\n  tower:\n    address: "+sentinelAddr+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\n"+sentinelAddr+": x\nhosts:\n  spoke:\n    address: "+sentinelAddr+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var body string
@@ -396,7 +396,7 @@ func TestServeFailureAfterStartupIsCountedAndNonFatal(t *testing.T) {
 		t.Fatalf("the failure was not logged by field path: %q", sv.stderr.String())
 	}
 	// Still running, and a fixed file recovers.
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: "+sentinelAddr+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: "+sentinelAddr+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, "recovery", func() bool {
@@ -423,7 +423,7 @@ func TestServeNeverEchoesOverlayValues(t *testing.T) {
 	if err := os.Remove(out); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: "+sentinelAddr+"\n    "+sentinelHost+": y\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: "+sentinelAddr+"\n    "+sentinelHost+": y\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, "an overlay failure in the journal", func() bool {

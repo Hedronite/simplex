@@ -1,14 +1,14 @@
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}
       - {kind: lan_reach, expected: light}
       - {kind: node_exporter, expected: light}
       - {kind: kube_apiserver, expected: dark}
       - {kind: ssh, expected: light}
-  - id: box
+  - id: edge
     checks:
       - {kind: prom_up, expected: light, path: /metrics}

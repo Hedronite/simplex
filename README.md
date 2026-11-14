@@ -48,20 +48,20 @@ exit 5, which is "I am cut off", not a mesh failure:
 $ cat > simplex.overlay.yaml <<EOF
 apiVersion: simplex.overlay/v0
 hosts:
-  tower:
-    address: tower.invalid
-  box:
-    address: box.invalid
-  lathe:
-    address: lathe.invalid
+  spoke:
+    address: spoke.invalid
+  edge:
+    address: edge.invalid
+  lab:
+    address: lab.invalid
 EOF
 $ simplex check --config example.yaml
 HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
-box    prom_up :9090/metrics        light     unknown  RED       vantage_blind
-lathe  prom_up :9090/-/ready        light     unknown  RED       vantage_blind
-tower  kube_apiserver :6443         dark      unknown  RED       vantage_blind
-tower  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
-tower  ts_reach :9100               light     unknown  RED       vantage_blind
+edge    prom_up :9090/metrics        light     unknown  RED       vantage_blind
+lab  prom_up :9090/-/ready        light     unknown  RED       vantage_blind
+spoke  kube_apiserver :6443         dark      unknown  RED       vantage_blind
+spoke  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
+spoke  ts_reach :9100               light     unknown  RED       vantage_blind
 $ echo $?
 5
 ```
@@ -124,16 +124,16 @@ private overlay (`simplex.overlay/v0`) that is never tracked. See
 ```yaml
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
   canaries:                      # each names a configured ts_reach check
-    - {host: tower, kind: ts_reach, target: ":9100"}
+    - {host: spoke, kind: ts_reach, target: ":9100"}
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}
       - {kind: kube_apiserver, expected: dark}
 holds:                            # temporary announced darks; all fields required
-  - {host: tower, kind: ts_reach, reason: planned maintenance,
+  - {host: spoke, kind: ts_reach, reason: planned maintenance,
      until: 2030-01-01T00:00:00Z}
 ```
 
@@ -257,12 +257,12 @@ simplex_vantage_status{status="blind"} 1
 simplex_vantage_status{status="unchecked"} 0
 # HELP simplex_host_severity Severity of one host: 0 GREEN, 1 YELLOW, 2 RED.
 # TYPE simplex_host_severity gauge
-simplex_host_severity{host="box"} 2
-simplex_host_severity{host="lathe"} 2
-simplex_host_severity{host="tower"} 2
+simplex_host_severity{host="edge"} 2
+simplex_host_severity{host="lab"} 2
+simplex_host_severity{host="spoke"} 2
 # HELP simplex_check_severity Severity of one check instance: 0 GREEN, 1 YELLOW, 2 RED.
 # TYPE simplex_check_severity gauge
-simplex_check_severity{host="box",kind="prom_up",target=":9090/metrics"} 2
+simplex_check_severity{host="edge",kind="prom_up",target=":9090/metrics"} 2
 ...
 ```
 

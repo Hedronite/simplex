@@ -139,20 +139,20 @@ Config (`simplex.config/v0`), public, slugs only. Strict decoding: unknown keys 
 ```yaml
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
   canaries:
-    - {host: tower, kind: ts_reach, target: ":9100"}
+    - {host: spoke, kind: ts_reach, target: ":9100"}
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}              # port optional
       - {kind: node_exporter, expected: light}
       - {kind: kube_apiserver, expected: dark}
-  - id: box
+  - id: edge
     checks:
       - {kind: prom_up, expected: light, path: /metrics}  # allowlist only
 holds:
-  - host: tower              # slug or "*"
+  - host: spoke              # slug or "*"
     kind: ts_reach           # kind or "*"
     reason: planned reboot   # required, scrubbed in CI
     until: "2026-11-20T00:00:00Z"  # RFC 3339 string, required; quote it
@@ -178,7 +178,7 @@ Overlay (`simplex.overlay/v0`): public shape, private values, never tracked (`si
 ```yaml
 apiVersion: simplex.overlay/v0
 hosts:
-  box:
+  edge:
     address: "<tailnet address or name>"
     lan_address: "<optional>"
     overrides:                 # optional, per (kind, target)
@@ -193,17 +193,17 @@ An override matches the host's check by `kind`, and by `target` when given; `por
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "ok"},
+  "vantage": {"id": "lab", "status": "ok"},
   "overall": "YELLOW",
   "hosts": [
-    {"id": "box", "severity": "YELLOW", "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
-    {"id": "lathe", "severity": "GREEN", "reasons": []}
+    {"id": "edge", "severity": "YELLOW", "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
+    {"id": "lab", "severity": "GREEN", "reasons": []}
   ],
   "checks": [
-    {"host": "box", "kind": "prom_up", "target": ":9090/metrics", "result": "down",
+    {"host": "edge", "kind": "prom_up", "target": ":9090/metrics", "result": "down",
      "severity": "YELLOW", "expected": "light",
      "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
-    {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
+    {"host": "lab", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
      "severity": "GREEN", "expected": "light", "reasons": []}
   ]
 }
@@ -228,7 +228,7 @@ No error path exits 0, 1 or 2. Under `--json`, every non-zero error exit (3, 4) 
 
 ## 11. Document file and fixtures
 
-Consumers such as Vigil read the document from a file and never run `simplex`.
+A downstream consumer, such as a query surface, reads the document from a file and never runs `simplex`.
 
 - `--out PATH` on `check` and `serve` writes the `--json` document to `PATH`: temp file in the same directory, `fsync`, atomic `rename`. A reader never sees a partial document. Mode `0644`. Slugs only.
 - Exits `0`, `1`, `2` and `5` write the document. Exits `3` and `4` never write, so the last good file stays in place and a reader detects staleness from `generated_at`.

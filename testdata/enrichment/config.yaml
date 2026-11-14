@@ -1,17 +1,17 @@
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: apiary
+  - id: core
     checks:
       - {kind: ts_reach, expected: light}
-  - id: box
+  - id: edge
     checks:
       - {kind: ts_reach, expected: light}
-  - id: lathe
+  - id: lab
     checks:
       - {kind: ts_reach, expected: light}
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}
 tailscale:

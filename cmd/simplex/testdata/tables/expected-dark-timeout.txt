@@ -1,2 +1,2 @@
 HOST   CHECK                 EXPECTED  RESULT   SEVERITY  REASONS
-tower  kube_apiserver :6443  dark      unknown  GREEN     expected_dark, tcp_connect_timeout
+spoke  kube_apiserver :6443  dark      unknown  GREEN     expected_dark, tcp_connect_timeout

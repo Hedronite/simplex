@@ -11,38 +11,38 @@ simplex_vantage_status{status="blind"} 0
 simplex_vantage_status{status="unchecked"} 1
 # HELP simplex_host_severity Severity of one host: 0 GREEN, 1 YELLOW, 2 RED.
 # TYPE simplex_host_severity gauge
-simplex_host_severity{host="tower"} 0
+simplex_host_severity{host="spoke"} 0
 # HELP simplex_check_severity Severity of one check instance: 0 GREEN, 1 YELLOW, 2 RED.
 # TYPE simplex_check_severity gauge
-simplex_check_severity{host="tower",kind="kube_apiserver",target=":6443"} 0
+simplex_check_severity{host="spoke",kind="kube_apiserver",target=":6443"} 0
 # HELP simplex_check_result One-hot probe result of one check instance.
 # TYPE simplex_check_result gauge
-simplex_check_result{host="tower",kind="kube_apiserver",target=":6443",result="up"} 0
-simplex_check_result{host="tower",kind="kube_apiserver",target=":6443",result="down"} 0
-simplex_check_result{host="tower",kind="kube_apiserver",target=":6443",result="unknown"} 1
+simplex_check_result{host="spoke",kind="kube_apiserver",target=":6443",result="up"} 0
+simplex_check_result{host="spoke",kind="kube_apiserver",target=":6443",result="down"} 0
+simplex_check_result{host="spoke",kind="kube_apiserver",target=":6443",result="unknown"} 1
 # HELP simplex_check_reason One series per frozen reason code, 1 when the check carries it.
 # TYPE simplex_check_reason gauge
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="tcp_connect_ok"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="tcp_connect_refused"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="tcp_connect_timeout"} 1
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="http_timeout"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="http_unexpected_status"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_not_ready"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_auth"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="metrics_body_unexpected"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="expected_dark"} 1
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="unexpected_light"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="unexpected_dark"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="held"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="probe_unknown"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_pair_down"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="prom_pair_degraded"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="vantage_blind"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="ts_peer_online"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="ts_peer_offline"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="ts_peer_unmatched"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="ts_path_direct"} 0
-simplex_check_reason{host="tower",kind="kube_apiserver",target=":6443",reason="ts_path_relayed"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="tcp_connect_ok"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="tcp_connect_refused"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="tcp_connect_timeout"} 1
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="http_timeout"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="http_unexpected_status"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="prom_not_ready"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="prom_auth"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="metrics_body_unexpected"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="expected_dark"} 1
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="unexpected_light"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="unexpected_dark"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="held"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="probe_unknown"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="prom_pair_down"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="prom_pair_degraded"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="vantage_blind"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="ts_peer_online"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="ts_peer_offline"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="ts_peer_unmatched"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="ts_path_direct"} 0
+simplex_check_reason{host="spoke",kind="kube_apiserver",target=":6443",reason="ts_path_relayed"} 0
 # HELP simplex_last_run_timestamp_seconds End of the last completed run, in Unix seconds.
 # TYPE simplex_last_run_timestamp_seconds gauge
 simplex_last_run_timestamp_seconds 1794592802

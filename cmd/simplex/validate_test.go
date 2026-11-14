@@ -52,7 +52,7 @@ func overlayForConfig(t *testing.T, cfgPath string) string {
 func TestValidateTableDrivenOverlay(t *testing.T) {
 	cfg := greenConfig(t)
 	fullOverlay := overlayForConfig(t, cfg)
-	partialOverlay := strings.Replace(fullOverlay, "  box:\n    address: box.invalid\n", "", 1)
+	partialOverlay := strings.Replace(fullOverlay, "  edge:\n    address: edge.invalid\n", "", 1)
 
 	dirtyStdout := func(r result) bool {
 		return r.stdout != ""
@@ -105,7 +105,7 @@ func TestValidateTableDrivenOverlay(t *testing.T) {
 		{
 			name:   "an incomplete overlay names the missing slugs",
 			args:   []string{"validate", "--config", cfg, "--overlay", "PARTIAL"},
-			stdout: contains("hosts.box"),
+			stdout: contains("hosts.edge"),
 			code:   exitcode.Config,
 		},
 		{
