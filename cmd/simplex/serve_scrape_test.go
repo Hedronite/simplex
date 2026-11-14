@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -57,16 +58,13 @@ func TestServeUnderFiftyScrapers(t *testing.T) {
 					firstErr.CompareAndSwap(nil, err.Error())
 					continue
 				}
-				body := make([]byte, 0, 64<<10)
-				buf := make([]byte, 16<<10)
-				for {
-					n, rerr := resp.Body.Read(buf)
-					body = append(body, buf[:n]...)
-					if rerr != nil {
-						break
-					}
-				}
+				body, rerr := io.ReadAll(resp.Body)
 				_ = resp.Body.Close()
+				if rerr != nil {
+					failed.Add(1)
+					firstErr.CompareAndSwap(nil, "read: "+rerr.Error())
+					continue
+				}
 				if resp.StatusCode != http.StatusOK {
 					failed.Add(1)
 					firstErr.CompareAndSwap(nil, fmt.Sprintf("status %d", resp.StatusCode))

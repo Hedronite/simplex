@@ -104,6 +104,16 @@ func TestSoakLoop(t *testing.T) {
 		}
 		t.Logf("passes=%d samples=%d heap first=%s last=%s peak=%s goroutines=%d",
 			ran, len(after), bytes(first.heap), bytes(last.heap), bytes(peak), last.goroutines)
+
+		// A leak is a slope, so the gate is on growth after warmup rather than
+		// on an absolute number. The tolerance is deliberately loose here and
+		// is set from the CI measurement in the follow-up commit: what it
+		// catches today is unbounded growth, not a few kilobytes of noise.
+		tolerance := first.heap/2 + 64<<10
+		if growth := peak - first.heap; growth > tolerance {
+			t.Fatalf("heap grew %s over %d passes after warmup (first %s, peak %s, tolerance %s)",
+				bytes(growth), len(after), bytes(first.heap), bytes(peak), bytes(tolerance))
+		}
 	})
 }
 

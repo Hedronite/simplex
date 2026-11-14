@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Hedronite/simplex/internal/check"
+	"github.com/Hedronite/simplex/internal/contract"
 	"github.com/Hedronite/simplex/internal/probe"
 )
 
@@ -43,17 +45,27 @@ func TestProfileFullPass(t *testing.T) {
 		t.Fatalf("write overlay: %v", err)
 	}
 
+	var dials atomic.Int64
 	runner := probe.New(&probe.Options{
-		Dialer:      refusingDialer{},
+		Dialer:      countingDialer{dials: &dials},
 		Timeout:     time.Second,
 		Concurrency: 8,
 	})
-	deps := &check.Deps{Runner: runner, Lister: noTailnet{}}
+	deps := &check.Deps{Runner: runner, Lister: tailnetPresent{}}
 	params := &check.Params{Config: cfgPath, Overlay: ovPath, Now: time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)}
 
 	// One warm pass, so the profile measures steady state.
-	if _, err := check.Run(context.Background(), params, deps); err != nil {
+	warm, err := check.Run(context.Background(), params, deps)
+	if err != nil {
 		t.Fatalf("warm pass: %v", err)
+	}
+	// A blind vantage skips every probe, so the profile would be of the load
+	// path alone. Both facts are asserted, not assumed.
+	if got := dials.Load(); got != hosts {
+		t.Fatalf("%d dials for %d hosts; the pass is not probing", got, hosts)
+	}
+	if warm.Doc.Vantage.Status == contract.VantageBlind {
+		t.Fatal("the vantage is blind, so nothing was probed")
 	}
 
 	cpuPath := filepath.Join(dir, "cpu.pprof")

@@ -8,11 +8,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/Hedronite/simplex/internal/check"
 	"github.com/Hedronite/simplex/internal/config"
+	"github.com/Hedronite/simplex/internal/contract"
 	"github.com/Hedronite/simplex/internal/document"
 	"github.com/Hedronite/simplex/internal/metrics"
 	"github.com/Hedronite/simplex/internal/overlay"
@@ -166,15 +169,31 @@ func BenchmarkCheckRun(b *testing.B) {
 			if err := os.WriteFile(ovPath, overlayYAML(n), 0o600); err != nil {
 				b.Fatalf("write overlay: %v", err)
 			}
+			var dials atomic.Int64
 			runner := probe.New(&probe.Options{
-				Dialer: refusingDialer{},
+				Dialer: countingDialer{dials: &dials},
 				// One attempt, no retry: the benchmark should not pay 250 ms per
 				// timeout, and a refusal is not retried anyway.
 				Timeout:     time.Second,
 				Concurrency: 8,
 			})
-			deps := &check.Deps{Runner: runner, Lister: noTailnet{}}
+			deps := &check.Deps{Runner: runner, Lister: tailnetPresent{}}
 			params := &check.Params{Config: cfgPath, Overlay: ovPath, Now: time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)}
+
+			// One pass outside the timer proves the harness probes: exactly one
+			// dial per check, a vantage that is not blind, and a check that
+			// reports up from its refusal.
+			dials.Store(0)
+			warm, err := check.Run(context.Background(), params, deps)
+			if err != nil {
+				b.Fatalf("warm run: %v", err)
+			}
+			if got := dials.Load(); got != int64(n) {
+				b.Fatalf("%d dials for %d checks; the run is not probing", got, n)
+			}
+			if warm.Doc.Vantage.Status == contract.VantageBlind {
+				b.Fatal("the vantage is blind, so nothing was probed")
+			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
@@ -191,30 +210,27 @@ func BenchmarkCheckRun(b *testing.B) {
 	}
 }
 
-// refusingDialer answers every dial with a refusal: the fastest fake mesh and
-// the one the severity rules treat as definitive.
-type refusingDialer struct{}
+// refusal wraps the real errno: the probe classifies with errors.Is, so a
+// look-alike error would be read as indeterminate instead of refused.
+var refusal = &net.OpError{Op: "dial", Net: "tcp", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}
 
-// DialContext refuses without touching a socket.
-func (refusingDialer) DialContext(context.Context, string, string) (net.Conn, error) {
+// countingDialer counts dials so a run that skips probing cannot pass as a
+// measurement of probing.
+type countingDialer struct{ dials *atomic.Int64 }
+
+// DialContext counts the dial and refuses it.
+func (c countingDialer) DialContext(context.Context, string, string) (net.Conn, error) {
+	c.dials.Add(1)
 	return nil, refusal
 }
 
-// refusal is an ECONNREFUSED-shaped error without importing syscall in a test
-// helper that has to stay portable.
-type refusedError struct{}
+// tailnetPresent is a lister that reports a tailnet address. It matters: with
+// no address the vantage is blind and the pipeline skips every probe, so a
+// benchmark or profile built on a false lister measures the load path and
+// nothing else. It reads no real interface.
+type tailnetPresent struct{}
 
-func (refusedError) Error() string   { return "connection refused" }
-func (refusedError) Timeout() bool   { return false }
-func (refusedError) Temporary() bool { return false }
+// HasTailnetAddress reports true.
+func (tailnetPresent) HasTailnetAddress() bool { return true }
 
-var refusal = &net.OpError{Op: "dial", Net: "tcp", Err: refusedError{}}
-
-// noTailnet is a lister that reports no tailnet address, which keeps the
-// vantage deterministic without reading real interfaces.
-type noTailnet struct{}
-
-// HasTailnetAddress reports false.
-func (noTailnet) HasTailnetAddress() bool { return false }
-
-var _ vantage.Lister = noTailnet{}
+var _ vantage.Lister = tailnetPresent{}

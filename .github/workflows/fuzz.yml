@@ -42,25 +42,40 @@ jobs:
         with:
           go-version: '1.27.x'
           check-latest: true
+      - name: note the seeds that already exist
+        run: |
+          set -euo pipefail
+          find . -path '*/testdata/fuzz/*' -type f | sort > "$RUNNER_TEMP/seeds-before.txt"
+          wc -l < "$RUNNER_TEMP/seeds-before.txt"
       - name: fuzz for two minutes
         # Two minutes per target, four targets in parallel: the schedule is
         # bounded well inside ten minutes of work.
         run: go test -run '^$' -fuzz "^${{ matrix.target }}$" -fuzztime 2m ${{ matrix.package }}
-      - name: collect a crasher
+      - name: collect the crasher
         if: failure()
         run: |
           set -euo pipefail
+          # Only what this run wrote: the seeds that were already in the tree are
+          # not evidence of anything.
+          find . -path '*/testdata/fuzz/*' -type f | sort > "$RUNNER_TEMP/seeds-after.txt"
+          mkdir -p crasher
+          comm -13 "$RUNNER_TEMP/seeds-before.txt" "$RUNNER_TEMP/seeds-after.txt" |
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              mkdir -p "crasher/$(dirname "$f")"
+              cp "$f" "crasher/$f"
+              echo "new input: $f" >> "$GITHUB_STEP_SUMMARY"
+            done
           {
-            echo "### ${{ matrix.target }} found a crasher"
             echo
-            echo 'The minimized input is in the artifact. Do not open an issue from it'
-            echo 'until the input has been read and the public-tree scrub passes on it.'
+            echo "The minimized input is in the artifact for \`${{ matrix.target }}\`."
+            echo 'A person opens the issue, and only after reading that input and'
+            echo 'confirming the public-tree scrub passes on it.'
           } >> "$GITHUB_STEP_SUMMARY"
-          find . -path '*/testdata/fuzz/*' -type f -newer go.mod -print | head -20
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: crasher-${{ matrix.target }}
-          path: '**/testdata/fuzz/**'
-          if-no-files-found: ignore
+          path: crasher/
+          if-no-files-found: warn
           retention-days: 30

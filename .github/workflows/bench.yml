@@ -33,6 +33,12 @@ jobs:
           set -euo pipefail
           base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
           git worktree add --detach ../base "$base"
+          # A base that predates these benchmarks has nothing to compare
+          # against: report the head alone rather than failing the PR.
+          if [ ! -d ../base/internal/perf ]; then
+            echo "the merge base has no internal/perf; reporting the head only" | tee bench-base.txt
+            exit 0
+          fi
           ( cd ../base && go test -run '^$' -bench . -benchmem -count 6 ./internal/perf/ ) > bench-base.txt
       - name: benchmark the head
         run: go test -run '^$' -bench . -benchmem -count 6 ./internal/perf/ > bench-head.txt
@@ -42,10 +48,15 @@ jobs:
           {
             echo '### benchmarks'
             echo
-            echo '`internal/perf`, six runs each, merge base against this head. Report only: time budgets are not gated on shared runners.'
+            echo '`internal/perf`, six runs each. Report only: time budgets are not gated on shared runners.'
             echo
             echo '```'
-            go run golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e bench-base.txt bench-head.txt
+            if grep -q '^goos:' bench-base.txt; then
+              go run golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e bench-base.txt bench-head.txt
+            else
+              echo 'no baseline: the merge base predates internal/perf'
+              cat bench-head.txt
+            fi
             echo '```'
           } > bench-comment.md
           cat bench-comment.md >> "$GITHUB_STEP_SUMMARY"
