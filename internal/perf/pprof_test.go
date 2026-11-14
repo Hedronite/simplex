@@ -67,6 +67,13 @@ func TestProfileFullPass(t *testing.T) {
 	if warm.Doc.Vantage.Status == contract.VantageBlind {
 		t.Fatal("the vantage is blind, so nothing was probed")
 	}
+	// A refused reach check is up; anything else means the fake errno was not
+	// recognised as a refusal, and the profile would be of the wrong path.
+	for _, c := range warm.Doc.Checks {
+		if c.Result != contract.ResultUp {
+			t.Fatalf("%s/%s is %s, want up from a refusal", c.Host, c.Kind, c.Result)
+		}
+	}
 
 	cpuPath := filepath.Join(dir, "cpu.pprof")
 	cpuFile, err := os.Create(cpuPath)

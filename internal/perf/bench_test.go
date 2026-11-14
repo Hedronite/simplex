@@ -194,6 +194,20 @@ func BenchmarkCheckRun(b *testing.B) {
 			if warm.Doc.Vantage.Status == contract.VantageBlind {
 				b.Fatal("the vantage is blind, so nothing was probed")
 			}
+			// The refusal must map to refused, not to indeterminate: a reach
+			// check that is refused is up, so a result of unknown here would
+			// mean the fake errno was not recognised.
+			ups, others := 0, 0
+			for _, c := range warm.Doc.Checks {
+				if c.Result == contract.ResultUp {
+					ups++
+				} else {
+					others++
+				}
+			}
+			if ups != n || others != 0 {
+				b.Fatalf("%d up and %d other results; the refusal is not mapping to refused", ups, others)
+			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
