@@ -1,8 +1,8 @@
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
 pot: 1
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}

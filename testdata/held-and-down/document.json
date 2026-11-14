@@ -1,13 +1,13 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "unchecked"},
+  "vantage": {"id": "lab", "status": "unchecked"},
   "overall": "GREEN",
   "hosts": [
-    {"id": "box", "severity": "GREEN", "reasons": ["held", "tcp_connect_refused"]}
+    {"id": "edge", "severity": "GREEN", "reasons": ["held", "tcp_connect_refused"]}
   ],
   "checks": [
-    {"host": "box", "kind": "node_exporter", "target": ":9100/metrics", "result": "down",
+    {"host": "edge", "kind": "node_exporter", "target": ":9100/metrics", "result": "down",
      "severity": "GREEN", "expected": "light",
      "reasons": ["held", "tcp_connect_refused"]}
   ]

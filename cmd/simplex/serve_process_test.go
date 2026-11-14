@@ -97,10 +97,10 @@ func TestServeProcessServesAndStopsOnSIGTERM(t *testing.T) {
 	cfg := filepath.Join(dir, "c.yaml")
 	ov := filepath.Join(dir, "o.txt")
 	port := target.Addr().(*net.TCPAddr).Port
-	if err := os.WriteFile(cfg, []byte(fmt.Sprintf("apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light, port: %d}\n", port)), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte(fmt.Sprintf("apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light, port: %d}\n", port)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: 127.0.0.1\n"), 0o600); err != nil {
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: 127.0.0.1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

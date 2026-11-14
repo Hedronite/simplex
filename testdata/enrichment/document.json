@@ -1,25 +1,25 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "unchecked"},
+  "vantage": {"id": "lab", "status": "unchecked"},
   "overall": "GREEN",
   "hosts": [
-    {"id": "apiary", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_peer_offline"]},
-    {"id": "box", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_path_relayed", "ts_peer_online"]},
-    {"id": "lathe", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_peer_unmatched"]},
-    {"id": "tower", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_path_direct", "ts_peer_online"]}
+    {"id": "core", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_peer_offline"]},
+    {"id": "edge", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_path_relayed", "ts_peer_online"]},
+    {"id": "lab", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_peer_unmatched"]},
+    {"id": "spoke", "severity": "GREEN", "reasons": ["tcp_connect_ok", "ts_path_direct", "ts_peer_online"]}
   ],
   "checks": [
-    {"host": "apiary", "kind": "ts_reach", "target": ":9100", "result": "up",
+    {"host": "core", "kind": "ts_reach", "target": ":9100", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": ["tcp_connect_ok", "ts_peer_offline"]},
-    {"host": "box", "kind": "ts_reach", "target": ":9100", "result": "up",
+    {"host": "edge", "kind": "ts_reach", "target": ":9100", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": ["tcp_connect_ok", "ts_path_relayed", "ts_peer_online"]},
-    {"host": "lathe", "kind": "ts_reach", "target": ":9100", "result": "up",
+    {"host": "lab", "kind": "ts_reach", "target": ":9100", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": ["tcp_connect_ok", "ts_peer_unmatched"]},
-    {"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
+    {"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": ["tcp_connect_ok", "ts_path_direct", "ts_peer_online"]}
   ]

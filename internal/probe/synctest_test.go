@@ -28,7 +28,7 @@ func TestRetryPacing(t *testing.T) {
 		})
 		start := time.Now()
 		obs := runner.Run(context.Background(), []Instance{{
-			Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100,
+			Host: "spoke", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100,
 		}})
 		elapsed := time.Since(start)
 
@@ -61,7 +61,7 @@ func TestAttemptTimeoutIsVirtual(t *testing.T) {
 		})
 		start := time.Now()
 		obs := runner.Run(context.Background(), []Instance{{
-			Host: "tower", Kind: contract.KindKubeAPIServer, Target: ":6443", Address: "placeholder.invalid", Port: 6443,
+			Host: "spoke", Kind: contract.KindKubeAPIServer, Target: ":6443", Address: "placeholder.invalid", Port: 6443,
 		}})
 		elapsed := time.Since(start)
 
@@ -104,9 +104,9 @@ func TestDispatchStopsAtTheRunDeadline(t *testing.T) {
 			})
 			start := time.Now()
 			obs := runner.Run(context.Background(), []Instance{
-				{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
-				{Host: "box", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
-				{Host: "apiary", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+				{Host: "spoke", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+				{Host: "edge", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+				{Host: "core", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
 			})
 			elapsed := time.Since(start)
 
@@ -202,7 +202,7 @@ func TestSSHBannerTimeoutIsRetried(t *testing.T) {
 		})
 		start := time.Now()
 		obs := runner.Run(context.Background(), []Instance{{
-			Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
+			Host: "spoke", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
 		}})
 		elapsed := time.Since(start)
 
@@ -234,7 +234,7 @@ func TestSSHBannerTimeoutTwiceIsUnknown(t *testing.T) {
 		})
 		start := time.Now()
 		obs := runner.Run(context.Background(), []Instance{{
-			Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
+			Host: "spoke", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
 		}})
 		elapsed := time.Since(start)
 

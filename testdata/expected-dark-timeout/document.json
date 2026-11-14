@@ -1,13 +1,13 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "unchecked"},
+  "vantage": {"id": "lab", "status": "unchecked"},
   "overall": "GREEN",
   "hosts": [
-    {"id": "tower", "severity": "GREEN", "reasons": ["expected_dark", "tcp_connect_timeout"]}
+    {"id": "spoke", "severity": "GREEN", "reasons": ["expected_dark", "tcp_connect_timeout"]}
   ],
   "checks": [
-    {"host": "tower", "kind": "kube_apiserver", "target": ":6443", "result": "unknown",
+    {"host": "spoke", "kind": "kube_apiserver", "target": ":6443", "result": "unknown",
      "severity": "GREEN", "expected": "dark",
      "reasons": ["expected_dark", "tcp_connect_timeout"]}
   ]

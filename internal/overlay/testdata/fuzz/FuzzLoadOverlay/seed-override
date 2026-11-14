@@ -1,2 +1,2 @@
 go test fuzz v1
-[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  box:\n    address: \"203.0.113.5\"\n    overrides:\n      - {kind: prom_up, target: \":9090/-/ready\", path: /metrics, port: 9091}\n")
+[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  edge:\n    address: \"203.0.113.5\"\n    overrides:\n      - {kind: prom_up, target: \":9090/-/ready\", path: /metrics, port: 9091}\n")

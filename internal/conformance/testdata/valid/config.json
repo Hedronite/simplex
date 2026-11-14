@@ -1,10 +1,10 @@
 {
   "apiVersion": "simplex.config/v0",
   "vantage": {
-    "id": "lathe",
+    "id": "lab",
     "canaries": [
       {
-        "host": "tower",
+        "host": "spoke",
         "kind": "ts_reach",
         "target": ":9100"
       }
@@ -12,7 +12,7 @@
   },
   "hosts": [
     {
-      "id": "tower",
+      "id": "spoke",
       "checks": [
         {
           "kind": "ts_reach",
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "id": "box",
+      "id": "edge",
       "checks": [
         {
           "kind": "prom_up",

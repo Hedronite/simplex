@@ -1,4 +1,4 @@
 apiVersion: simplex.overlay/v0
 hosts:
-  Tower:
+  Spoke:
     address: "192.0.2.10"

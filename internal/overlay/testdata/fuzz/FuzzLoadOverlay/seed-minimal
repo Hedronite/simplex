@@ -1,2 +1,2 @@
 go test fuzz v1
-[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: \"192.0.2.10\"\n")
+[]byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: \"192.0.2.10\"\n")
