@@ -6,6 +6,14 @@
 # this into a draft GitHub release; nothing here publishes on its own.
 version: 2
 
+# One commit often carries two tags: a release candidate and the final version
+# are the same tree. goreleaser picks between the tags pointing at HEAD with a
+# version sort, and this is how it knows that `-rc.1` ranks below `0.1.0`. It
+# keeps the choice right wherever the config is the only thing in play, without
+# depending on a setting the machine happens to carry.
+git:
+  prerelease_suffix: "-"
+
 project_name: simplex
 
 before:
