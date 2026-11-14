@@ -1,17 +1,17 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "unchecked"},
+  "vantage": {"id": "lab", "status": "unchecked"},
   "overall": "RED",
   "hosts": [
-    {"id": "box", "severity": "RED", "reasons": ["http_unexpected_status", "prom_pair_down", "unexpected_dark"]},
-    {"id": "lathe", "severity": "RED", "reasons": ["http_unexpected_status", "prom_pair_down", "unexpected_dark"]}
+    {"id": "edge", "severity": "RED", "reasons": ["http_unexpected_status", "prom_pair_down", "unexpected_dark"]},
+    {"id": "lab", "severity": "RED", "reasons": ["http_unexpected_status", "prom_pair_down", "unexpected_dark"]}
   ],
   "checks": [
-    {"host": "box", "kind": "prom_up", "target": ":9090/-/ready", "result": "down",
+    {"host": "edge", "kind": "prom_up", "target": ":9090/-/ready", "result": "down",
      "severity": "RED", "expected": "light",
      "reasons": ["http_unexpected_status", "prom_pair_down", "unexpected_dark"]},
-    {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "down",
+    {"host": "lab", "kind": "prom_up", "target": ":9090/-/ready", "result": "down",
      "severity": "RED", "expected": "light",
      "reasons": ["http_unexpected_status", "prom_pair_down", "unexpected_dark"]}
   ]

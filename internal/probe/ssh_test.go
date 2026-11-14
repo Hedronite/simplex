@@ -151,7 +151,7 @@ func TestSSHBannerReads(t *testing.T) {
 				}),
 			})
 			obs := runner.Run(context.Background(), []Instance{{
-				Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "127.0.0.1", Port: port,
+				Host: "spoke", Kind: contract.KindSSH, Target: ":22", Address: "127.0.0.1", Port: port,
 			}})
 			if obs[0].Result != tc.result || obs[0].Outcome != tc.outcome {
 				t.Fatalf("got (%s, %q), want (%s, %q)", obs[0].Result, obs[0].Outcome, tc.result, tc.outcome)
@@ -175,7 +175,7 @@ func TestSSHConnectTimeoutIsRetried(t *testing.T) {
 		}),
 	})
 	obs := runner.Run(context.Background(), []Instance{{
-		Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
+		Host: "spoke", Kind: contract.KindSSH, Target: ":22", Address: "placeholder.invalid", Port: 22,
 	}})
 	if obs[0].Result != contract.ResultUnknown || obs[0].Outcome != contract.ReasonTCPConnectTimeout {
 		t.Fatalf("got (%s, %q), want (unknown, tcp_connect_timeout)", obs[0].Result, obs[0].Outcome)
@@ -197,7 +197,7 @@ func TestSSHNeverWrites(t *testing.T) {
 		read <- buf[:n]
 	})
 	obs := New(&Options{Timeout: time.Second}).Run(context.Background(), []Instance{{
-		Host: "tower", Kind: contract.KindSSH, Target: ":22", Address: "127.0.0.1", Port: port,
+		Host: "spoke", Kind: contract.KindSSH, Target: ":22", Address: "127.0.0.1", Port: port,
 	}})
 	if obs[0].Result != contract.ResultUp {
 		t.Fatalf("got %s, want up", obs[0].Result)
@@ -225,8 +225,8 @@ func TestLANReachFollowsTheReachRules(t *testing.T) {
 	_ = closed.Close()
 
 	obs := New(&Options{RetryDelay: time.Millisecond}).Run(context.Background(), []Instance{
-		{Host: "tower", Kind: contract.KindLANReach, Target: ":22", Address: "127.0.0.1", Port: open},
-		{Host: "tower", Kind: contract.KindLANReach, Target: ":22", Address: "127.0.0.1", Port: closedPort},
+		{Host: "spoke", Kind: contract.KindLANReach, Target: ":22", Address: "127.0.0.1", Port: open},
+		{Host: "spoke", Kind: contract.KindLANReach, Target: ":22", Address: "127.0.0.1", Port: closedPort},
 	})
 	if obs[0].Result != contract.ResultUp || obs[0].Outcome != contract.ReasonTCPConnectOK {
 		t.Fatalf("open port: got (%s, %q), want (up, tcp_connect_ok)", obs[0].Result, obs[0].Outcome)

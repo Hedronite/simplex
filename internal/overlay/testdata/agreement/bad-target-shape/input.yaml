@@ -1,6 +1,6 @@
 apiVersion: simplex.overlay/v0
 hosts:
-  tower:
+  spoke:
     address: "192.0.2.10"
     overrides:
       - {kind: ts_reach, target: "9100"}

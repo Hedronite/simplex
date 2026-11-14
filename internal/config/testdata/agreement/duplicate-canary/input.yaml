@@ -1,10 +1,10 @@
 apiVersion: simplex.config/v0
 vantage:
-  id: lathe
+  id: lab
   canaries:
-    - {host: tower, kind: ts_reach, target: ":9100"}
-    - {host: tower, kind: ts_reach, target: ":9100"}
+    - {host: spoke, kind: ts_reach, target: ":9100"}
+    - {host: spoke, kind: ts_reach, target: ":9100"}
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}

@@ -1,6 +1,6 @@
 vantage:
-  id: lathe
+  id: lab
 hosts:
-  - id: tower
+  - id: spoke
     checks:
       - {kind: ts_reach, expected: light}

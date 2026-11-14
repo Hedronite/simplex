@@ -84,7 +84,7 @@ func TestHTTPStatusMap(t *testing.T) {
 			host, port := resolveStarted(t, srv)
 
 			obs := New(&Options{Timeout: time.Second}).Run(context.Background(), []Instance{{
-				Host: "box", Kind: tc.kind, Target: ":9090" + tc.path, Address: host, Port: port, Path: tc.path,
+				Host: "edge", Kind: tc.kind, Target: ":9090" + tc.path, Address: host, Port: port, Path: tc.path,
 			}})
 
 			if len(obs) != 1 {
@@ -113,7 +113,7 @@ func TestHTTPRedirectIsNotFollowed(t *testing.T) {
 	host, port := resolveStarted(t, srv)
 
 	obs := New(&Options{}).Run(context.Background(), []Instance{{
-		Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready", Address: host, Port: port, Path: contract.PathReady,
+		Host: "edge", Kind: contract.KindPromUp, Target: ":9090/-/ready", Address: host, Port: port, Path: contract.PathReady,
 	}})
 	if followed.Load() != 0 {
 		t.Fatalf("the redirect was followed %d times", followed.Load())
@@ -149,7 +149,7 @@ func TestHTTPBodyCap(t *testing.T) {
 
 	start := time.Now()
 	obs := New(&Options{Timeout: 2 * time.Second}).Run(context.Background(), []Instance{{
-		Host: "box", Kind: contract.KindPromUp, Target: ":9090/metrics", Address: host, Port: port, Path: contract.PathMetrics,
+		Host: "edge", Kind: contract.KindPromUp, Target: ":9090/metrics", Address: host, Port: port, Path: contract.PathMetrics,
 	}})
 	if obs[0].Result != contract.ResultUp {
 		t.Fatalf("got %s, want up: the cap should end the read", obs[0].Result)
@@ -172,7 +172,7 @@ func TestHTTPResponseTimeoutIsRetried(t *testing.T) {
 
 	obs := New(&Options{Timeout: 50 * time.Millisecond, RetryDelay: 10 * time.Millisecond}).
 		Run(context.Background(), []Instance{{
-			Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready", Address: host, Port: port, Path: contract.PathReady,
+			Host: "edge", Kind: contract.KindPromUp, Target: ":9090/-/ready", Address: host, Port: port, Path: contract.PathReady,
 		}})
 
 	if obs[0].Result != contract.ResultUnknown || obs[0].Outcome != contract.ReasonHTTPTimeout {
@@ -197,7 +197,7 @@ func TestHTTPTransportSeam(t *testing.T) {
 		}, nil
 	})
 	obs := New(&Options{Transport: seam}).Run(context.Background(), []Instance{{
-		Host: "box", Kind: contract.KindPromUp, Target: ":9090/-/ready", Address: "placeholder.invalid", Port: 9090, Path: contract.PathReady,
+		Host: "edge", Kind: contract.KindPromUp, Target: ":9090/-/ready", Address: "placeholder.invalid", Port: 9090, Path: contract.PathReady,
 	}})
 	if obs[0].Result != contract.ResultUp {
 		t.Fatalf("got %s, want up through the transport seam", obs[0].Result)
@@ -238,9 +238,9 @@ func TestTCPAcceptAndRefuse(t *testing.T) {
 	_ = closed.Close()
 
 	obs := New(&Options{RetryDelay: time.Millisecond}).Run(context.Background(), []Instance{
-		{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: host, Port: openPort},
-		{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: host, Port: closedPort},
-		{Host: "box", Kind: contract.KindKubeAPIServer, Target: ":6443", Address: closedHost, Port: closedPort},
+		{Host: "spoke", Kind: contract.KindTSReach, Target: ":9100", Address: host, Port: openPort},
+		{Host: "spoke", Kind: contract.KindTSReach, Target: ":9100", Address: host, Port: closedPort},
+		{Host: "edge", Kind: contract.KindKubeAPIServer, Target: ":6443", Address: closedHost, Port: closedPort},
 	})
 
 	want := []struct {
@@ -297,7 +297,7 @@ func TestDialOutcomes(t *testing.T) {
 				}),
 			})
 			obs := runner.Run(context.Background(), []Instance{{
-				Host: "tower", Kind: contract.KindKubeAPIServer, Target: ":6443", Address: "placeholder.invalid", Port: 6443,
+				Host: "spoke", Kind: contract.KindKubeAPIServer, Target: ":6443", Address: "placeholder.invalid", Port: 6443,
 			}})
 			if obs[0].Result != tc.result || obs[0].Outcome != tc.outcome {
 				t.Fatalf("got (%s, %q), want (%s, %q)", obs[0].Result, obs[0].Outcome, tc.result, tc.outcome)
@@ -323,7 +323,7 @@ func TestDeniedPortIsRefusedOnTheHTTPPath(t *testing.T) {
 	opts.withDefaults()
 
 	result, outcome, retried := opts.probeHTTP(context.Background(), &Instance{
-		Host: "box", Kind: contract.KindPromUp, Target: ":" + strconv.Itoa(contract.DeniedPort) + contract.PathReady,
+		Host: "edge", Kind: contract.KindPromUp, Target: ":" + strconv.Itoa(contract.DeniedPort) + contract.PathReady,
 		Address: "placeholder.invalid", Port: contract.DeniedPort, Path: contract.PathReady,
 	})
 	if requests.Load() != 0 {
@@ -348,7 +348,7 @@ func TestDeniedPortIsNeverDialled(t *testing.T) {
 		return nil, errors.New("must not dial")
 	})})
 	obs := runner.Run(context.Background(), []Instance{{
-		Host: "box", Kind: contract.KindTSReach, Target: ":" + strconv.Itoa(contract.DeniedPort),
+		Host: "edge", Kind: contract.KindTSReach, Target: ":" + strconv.Itoa(contract.DeniedPort),
 		Address: "placeholder.invalid", Port: contract.DeniedPort,
 	}})
 	if dials.Load() != 0 {
@@ -424,8 +424,8 @@ func TestRunDeadlineIsBounded(t *testing.T) {
 		RetryDelay: time.Millisecond,
 		Dialer:     blocked,
 	}).Run(context.Background(), []Instance{
-		{Host: "tower", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
-		{Host: "box", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+		{Host: "spoke", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
+		{Host: "edge", Kind: contract.KindTSReach, Target: ":9100", Address: "placeholder.invalid", Port: 9100},
 	})
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("run took %v, the deadline is 60ms", elapsed)
@@ -471,7 +471,7 @@ func TestNodeExporterFailures(t *testing.T) {
 
 	t.Run("refused is down", func(t *testing.T) {
 		obs := New(&Options{RetryDelay: time.Millisecond}).Run(context.Background(), []Instance{{
-			Host: "tower", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+			Host: "spoke", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
 			Address: "127.0.0.1", Port: closedPort, Path: contract.PathMetrics,
 		}})
 		if obs[0].Result != contract.ResultDown || obs[0].Outcome != contract.ReasonTCPConnectRefused {
@@ -491,7 +491,7 @@ func TestNodeExporterFailures(t *testing.T) {
 
 		obs := New(&Options{Timeout: 50 * time.Millisecond, RetryDelay: 10 * time.Millisecond}).
 			Run(context.Background(), []Instance{{
-				Host: "tower", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+				Host: "spoke", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
 				Address: host, Port: port, Path: contract.PathMetrics,
 			}})
 		if obs[0].Result != contract.ResultUnknown || obs[0].Outcome != contract.ReasonHTTPTimeout {
@@ -509,7 +509,7 @@ func TestNodeExporterFailures(t *testing.T) {
 		defer srv.Close()
 		host, port := resolveStarted(t, srv)
 		obs := New(&Options{}).Run(context.Background(), []Instance{{
-			Host: "tower", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
+			Host: "spoke", Kind: contract.KindNodeExporter, Target: ":9100/metrics",
 			Address: host, Port: port, Path: contract.PathMetrics,
 		}})
 		if obs[0].Result != contract.ResultDown || obs[0].Outcome != contract.ReasonHTTPUnexpectedStatus {

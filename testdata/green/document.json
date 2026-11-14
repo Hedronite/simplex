@@ -1,27 +1,27 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "ok"},
+  "vantage": {"id": "lab", "status": "ok"},
   "overall": "GREEN",
   "hosts": [
-    {"id": "box", "severity": "GREEN", "reasons": []},
-    {"id": "lathe", "severity": "GREEN", "reasons": []},
-    {"id": "tower", "severity": "GREEN", "reasons": ["expected_dark", "tcp_connect_refused", "tcp_connect_ok"]}
+    {"id": "edge", "severity": "GREEN", "reasons": []},
+    {"id": "lab", "severity": "GREEN", "reasons": []},
+    {"id": "spoke", "severity": "GREEN", "reasons": ["expected_dark", "tcp_connect_refused", "tcp_connect_ok"]}
   ],
   "checks": [
-    {"host": "box", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
+    {"host": "edge", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": []},
-    {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
+    {"host": "lab", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": []},
-    {"host": "tower", "kind": "kube_apiserver", "target": ":6443", "result": "down",
+    {"host": "spoke", "kind": "kube_apiserver", "target": ":6443", "result": "down",
      "severity": "GREEN", "expected": "dark",
      "reasons": ["expected_dark", "tcp_connect_refused"]},
-    {"host": "tower", "kind": "node_exporter", "target": ":9100/metrics", "result": "up",
+    {"host": "spoke", "kind": "node_exporter", "target": ":9100/metrics", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": []},
-    {"host": "tower", "kind": "ts_reach", "target": ":9100", "result": "up",
+    {"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
      "severity": "GREEN", "expected": "light",
      "reasons": ["tcp_connect_ok"]}
   ]

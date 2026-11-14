@@ -50,7 +50,7 @@ func TestEnrichmentRulesAreEnforced(t *testing.T) {
 		"path without a peer":    ts(contract.ReasonTSPathDirect),
 		"path on an unmatched":   ts(contract.ReasonTSPeerUnmatched, contract.ReasonTSPathDirect),
 	} {
-		if _, err := Evaluate(&Input{Now: fixtureNow, VantageID: "lathe", VantageStatus: contract.VantageOK, Checks: []Observation{o}}); err == nil {
+		if _, err := Evaluate(&Input{Now: fixtureNow, VantageID: "lab", VantageStatus: contract.VantageOK, Checks: []Observation{o}}); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
 	}

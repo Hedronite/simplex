@@ -19,7 +19,7 @@ var runNow = time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
 // the tree scrub, which only warns on them, and can never be real values.
 const (
 	secretIP   = "192.0.2.77"
-	secretHost = "box.tail.example"
+	secretHost = "edge.tail.example"
 )
 
 func write(t *testing.T, dir, name, body string) string {
@@ -31,7 +31,7 @@ func write(t *testing.T, dir, name, body string) string {
 	return p
 }
 
-const goodConfig = "apiVersion: simplex.config/v0\nvantage:\n  id: lathe\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n"
+const goodConfig = "apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"
 
 func deps() *Deps {
 	return &Deps{Runner: probe.Default(), Getenv: func(string) string { return "" }}
@@ -43,9 +43,9 @@ func TestFieldsNeverRepeatPrivateValues(t *testing.T) {
 	dir := t.TempDir()
 	cfg := write(t, dir, "c.yaml", goodConfig)
 	for name, overlayText := range map[string]string{
-		"address as a top-level key": "apiVersion: simplex.overlay/v0\n192.0.2.77: x\nhosts:\n  tower:\n    address: placeholder.invalid\n",
+		"address as a top-level key": "apiVersion: simplex.overlay/v0\n192.0.2.77: x\nhosts:\n  spoke:\n    address: placeholder.invalid\n",
 		"address as a host key":      "apiVersion: simplex.overlay/v0\nhosts:\n  192.0.2.77:\n    address: placeholder.invalid\n",
-		"hostname as an extra key":   "apiVersion: simplex.overlay/v0\nhosts:\n  tower:\n    address: placeholder.invalid\n    box.tail.example: y\n",
+		"hostname as an extra key":   "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: placeholder.invalid\n    edge.tail.example: y\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			ov := write(t, dir, "o-"+strings.ReplaceAll(name, " ", "-")+".txt", overlayText)
@@ -66,7 +66,7 @@ func TestFieldsNeverRepeatPrivateValues(t *testing.T) {
 
 func TestFieldsKeepRealFieldPaths(t *testing.T) {
 	dir := t.TempDir()
-	cfg := write(t, dir, "c.yaml", "apiVersion: simplex.config/v0\nvantage:\n  id: lathe\n  canaries:\n    - {host: ghost, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: tower\n    checks:\n      - {kind: ts_reach, expected: light}\n")
+	cfg := write(t, dir, "c.yaml", "apiVersion: simplex.config/v0\nvantage:\n  id: lab\n  canaries:\n    - {host: ghost, kind: ts_reach, target: \":9100\"}\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n")
 	_, err := Run(context.Background(), &Params{Config: cfg, Now: runNow}, deps())
 	var re *RunError
 	if !errors.As(err, &re) {
@@ -81,8 +81,8 @@ func TestFieldsKeepRealFieldPaths(t *testing.T) {
 }
 
 func TestSafePath(t *testing.T) {
-	keep := []string{"", "hosts", "hosts[0].checks[1].path", "vantage.canaries[0].host", "hosts.tower.address", "hosts.tower.overrides[0].kind", "apiVersion"}
-	drop := []string{secretIP, secretHost, "hosts.Tower", "hosts.198.51.100.9.address", "weird key", "hosts[x].id", "hosts[0"}
+	keep := []string{"", "hosts", "hosts[0].checks[1].path", "vantage.canaries[0].host", "hosts.spoke.address", "hosts.spoke.overrides[0].kind", "apiVersion"}
+	drop := []string{secretIP, secretHost, "hosts.Spoke", "hosts.198.51.100.9.address", "weird key", "hosts[x].id", "hosts[0"}
 	for _, p := range keep {
 		if safePath(p) != p {
 			t.Errorf("safePath(%q) dropped a real field path", p)
