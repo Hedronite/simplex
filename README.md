@@ -17,13 +17,14 @@ run.
 ## Position in the family
 
 ```
-Simplex (probe) ──simplex.probe/v0 + simplex_*──▶ Vigil (query surface) ──▶ Facet (client)
+Simplex (probe) ──simplex.probe/v0 + simplex_*──▶ a downstream query surface ──▶ a client
 ```
 
 Simplex computes per-check `result` and `severity` and the `overall` rollup.
-Vigil re-exposes it; it does not invent a second one. Alert-state rules (watch
-severities derived from Prometheus/Alertmanager alerts) live in a separate
-classifier, not here: Simplex reports only what it can observe itself.
+A downstream query surface re-exposes it; it does not invent a second one.
+Alert-state rules (watch severities derived from Prometheus/Alertmanager
+alerts) live in a separate classifier, not here: Simplex reports only what it
+can observe itself.
 
 ## Quickstart
 
@@ -78,6 +79,9 @@ $ simplex version --json
 {"version":"dev","commit":"unknown","built":"unknown"}
 ```
 
+A source build prints the fallbacks above; a release build prints its version,
+commit and built date in the same shapes.
+
 - `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
 - Releases are produced with reproducible builds; until then, build from source
   with Go 1.27 or newer.
@@ -87,26 +91,11 @@ $ simplex version --json
 A run produces one `simplex.probe/v0` document (see `docs/semantics.md` §9 for
 the full contract):
 
-```json
-{
-  "apiVersion": "simplex.probe/v0",
-  "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lathe", "status": "ok"},
-  "overall": "YELLOW",
-  "hosts": [
-    {"id": "box", "severity": "YELLOW",
-     "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
-    {"id": "lathe", "severity": "GREEN", "reasons": []}
-  ],
-  "checks": [
-    {"host": "box", "kind": "prom_up", "target": ":9090/metrics", "result": "down",
-     "severity": "YELLOW", "expected": "light",
-     "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
-    {"host": "lathe", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []}
-  ]
-}
-```
+Captured documents live in the repository as fixtures:
+`testdata/green/document.json` is a complete GREEN run (every check answering,
+with the expected-dark `:6443` connect read as GREEN), and the fixture replay
+test reproduces every fixture byte for byte through the binary on each commit,
+so the documented shape and the shipped bytes cannot drift.
 
 Field names and the reason codes are frozen (16 at S0, five enrichment codes added at S3) (see §4 and §13 of
 `docs/semantics.md`); changes after S1 are breaking. The check kinds are an open
@@ -161,6 +150,51 @@ holds:                            # temporary announced darks; all fields requir
   that needs an address with no overlay entry fails closed (exit 3), naming the
   missing slugs. Overlay files (`simplex.overlay.yaml`, `*.overlay.yaml`) are
   gitignored; never commit one.
+
+## Tailscale enrichment
+
+Optional, off by default, Linux unix socket only. A `ts_reach` connect says
+whether a port answered; the tailnet daemon on the vantage also knows whether
+the peer is online and whether traffic runs direct or through a relay.
+Enrichment reads that state and attaches it to the check as extra reason
+codes: `ts_peer_online`, `ts_peer_offline`, `ts_peer_unmatched`,
+`ts_path_direct` and `ts_path_relayed`.
+
+Turn it on in the config:
+
+```yaml
+tailscale:                   # optional, off by default
+  localapi: true             # required when the block is present
+  socket: /var/run/tailscale/tailscaled.sock   # optional, absolute path only
+```
+
+- **Informational only.** Enrichment never changes a `result`, a `severity`,
+  the rollup or the exit code. It explains an unexplained timeout; it does not
+  judge.
+- **Access limits.** One request per run: `GET /localapi/v0/status` with a
+  constant path and method, no body, over the configured unix socket. No
+  root, no capabilities, no `tailscale` command or any process execution, no
+  mutating call, and the socket file is never created or written. The request
+  times out in 2 s inside the pass deadline; the response is capped, decoded
+  into a minimal structure and reduced to booleans — no payload text reaches
+  an error or a log.
+- **A warning means** the daemon could not be read — socket missing,
+  unreadable, slow, oversize or malformed — once per run, by field path. The
+  run then behaves exactly as if enrichment were off.
+
+The full contract is `docs/semantics.md` §15.
+
+## Dashboard
+
+`grafana/dashboards/simplex.json` provisions one dashboard on an existing
+Grafana, and `grafana/provisioning/dashboards/simplex.yaml` is the file
+provider for it. How to install them, what each panel means, and how blind
+and stale read are in `docs/dashboard.md`.
+
+## Performance
+
+Benchmark, profile and soak results, and the gates they feed, are in
+`docs/performance.md`.
 
 ## Serve and metrics
 
@@ -238,8 +272,9 @@ The full series table, the one-hot rulings, the cold-start behavior and the
 cardinality formula are in `docs/metrics.md`.
 
 **Scope:** Simplex reports what it probes. There are no disk series — disk
-severity reaches the mesh summary through Cubit — and no alert-state series.
-Labels carry host slugs, check kinds and target forms only, never addresses.
+severity reaches the mesh summary through a companion collector — and no
+alert-state series. Labels carry host slugs, check kinds and target forms
+only, never addresses.
 
 **Deployment is a separate decision:** building `serve` is part of this
 repository; seating it on a mesh host and adding its scrape job to a

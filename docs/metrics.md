@@ -9,7 +9,8 @@ scrape never sees a half-updated document.
 ## Scope
 
 Simplex reports what it probes. There are **no disk series** — disk severity
-reaches the mesh summary through Cubit, not here — and no alert-state series:
+reaches the mesh summary through a companion collector, not here — and no
+alert-state series:
 alert-derived judgments belong to the alert classifier. Labels carry host
 slugs, check kinds and target forms only; **no label ever holds an address**,
 and a tracked-file scrub plus a label scrub test keep it that way.
@@ -38,6 +39,11 @@ Rulings baked into this table:
   **frozen enums**, not over what the document carries: every check exports a
   series for every result value and every reason code, 1 or 0. Series stay
   stable, so a clearing reason reads 1 to 0 and PromQL needs no `absent()`;
+- the five enrichment codes from `docs/semantics.md` section 15 carry their
+  own one-hot series under `simplex_check_reason`, with `reason` labels
+  `ts_peer_online`, `ts_peer_offline`, `ts_peer_unmatched`, `ts_path_direct`
+  and `ts_path_relayed`. Enrichment is informational: it never moves a
+  severity, so these series explain and never alert;
   an unknown code can never become a label.
 - `simplex_check_reason` is driven by the frozen enum even if a document
   carried a code the contract does not know: the label space cannot grow past
