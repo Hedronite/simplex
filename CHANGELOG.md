@@ -33,6 +33,9 @@ and the release tooling.
   codes to `ts_reach` checks. Informational only; never changes a verdict.
 - A Grafana dashboard with its file provider, and the drift test that keeps
   the dashboard's queries in step with the exported series.
+- A release pipeline: reproducible archives and binaries, a per-archive
+  CycloneDX SBOM, a cosign keyless signature bundle over the checksums file,
+  pinned workflow actions, and benchmarks, profiles and a soak pass in CI.
 ### Security
 
 - Inspect-only by design: probes send no credentials, never mutate a host,
