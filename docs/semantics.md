@@ -228,7 +228,7 @@ No error path exits 0, 1 or 2. Under `--json`, every non-zero error exit (3, 4) 
 
 ## 11. Document file and fixtures
 
-Consumers such as Vigil read the document from a file and never run `simplex`.
+A downstream consumer, such as a query surface, reads the document from a file and never runs `simplex`.
 
 - `--out PATH` on `check` and `serve` writes the `--json` document to `PATH`: temp file in the same directory, `fsync`, atomic `rename`. A reader never sees a partial document. Mode `0644`. Slugs only.
 - Exits `0`, `1`, `2` and `5` write the document. Exits `3` and `4` never write, so the last good file stays in place and a reader detects staleness from `generated_at`.
