@@ -10,10 +10,10 @@ normal deployment decision.
 
 - Grafana 13.x (the JSON carries `schemaVersion` 42; Grafana migrates older
   numbers up on import).
-- A Prometheus datasource that scrapes `simplex serve`, with the uid
-  `lea-prom`: every panel and every variable in the dashboard names exactly
-  that datasource by uid. The uid must match an existing datasource in your
-  Grafana; if yours differs, change it once in the JSON.
+- A Prometheus datasource in your Grafana that scrapes `simplex serve`. The
+  dashboard asks which one to use: a selector at the top of the page,
+  defaulting to the instance default datasource. Pick the one that scrapes
+  `simplex serve` — nothing to edit in the JSON.
 
 ## Provisioning
 
