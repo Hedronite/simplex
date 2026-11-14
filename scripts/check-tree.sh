@@ -141,9 +141,18 @@ while IFS= read -r wf; do
 			fi
 			record "$wf:$line: action is not pinned to a commit: $ref"
 		done
+	# A trailing comment is documentation, not configuration: a pinned action
+	# followed by "# v7.0.1" is the intended shape, and a comment that mentions
+	# a moving version (for example explaining why one is refused) is not a
+	# finding. Strip the comment before looking.
 	grep -nE '@(latest|main|master)([^A-Za-z0-9_.-]|$)' "$wf" 2>/dev/null |
 		while IFS=: read -r line text; do
-			record "$wf:$line: a tool is fetched at a moving version: $text"
+			code=$(printf '%s' "$text" | sed -E 's/^[^#]*//; s/^#//; s/#.*$//')
+			# Remove the comment entirely, then look again.
+			code=$(printf '%s' "$text" | sed -E 's/[[:space:]]+#.*$//')
+			if printf '%s' "$code" | grep -qE '@(latest|main|master)([^A-Za-z0-9_.-]|$)'; then
+				record "$wf:$line: a tool is fetched at a moving version: $code"
+			fi
 		done
 done <<EOF_WORKFLOWS
 $(grep -E '^\.github/workflows/.*\.ya?ml$' "$list")

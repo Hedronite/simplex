@@ -1,0 +1,88 @@
+# goreleaser v2 configuration.
+#
+# One binary, three targets, and every field chosen so two builds of one commit
+# are byte-identical: no build time anywhere, the commit timestamp is used for
+# file modification times, and paths are trimmed. The release workflow turns
+# this into a draft GitHub release; nothing here publishes on its own.
+version: 2
+
+project_name: simplex
+
+before:
+  hooks:
+    - go mod verify
+
+builds:
+  - id: simplex
+    main: ./cmd/simplex
+    binary: simplex
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # -s -w strip the symbol table and DWARF; the stamps are what
+    # `simplex version` prints, and the build date is the commit date so a
+    # rebuild of the same commit does not change the binary.
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.FullCommit}}
+      - -X main.built={{.CommitDate}}
+    # Pinned to the commit, not the wall clock: the second field that has to be
+    # fixed for a reproducible archive.
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # Windows is out of scope (the probe assumes unix sockets and
+      # interfaces) and darwin/amd64 is not a target unless PM adds it.
+      - goos: darwin
+        goarch: amd64
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE
+      - README.md
+      - CONTRIBUTING.md
+      - SECURITY.md
+      - example.yaml
+      - grafana/dashboards/simplex.json
+      - grafana/provisioning/dashboards/simplex.yaml
+
+checksum:
+  name_template: checksums.txt
+
+# One CycloneDX SBOM per archive, produced by syft. The release CI job asserts
+# that the module's direct dependencies are listed and that the test-only ones
+# are not.
+sboms:
+  - id: archive
+    artifacts: archive
+    documents:
+      - '${artifact}.sbom.cdx.json'
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}'
+
+release:
+  # A person publishes it. CI never makes a release public on its own.
+  draft: true
+  prerelease: auto
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'

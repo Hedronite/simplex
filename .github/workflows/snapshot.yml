@@ -1,0 +1,120 @@
+# Snapshot builds: reproducibility, stamps, SBOMs and signatures.
+#
+# Nothing here publishes. The release workflow is the only thing that can, and
+# only on a tag. This job exists to prove the claims SPEC section 7 makes
+# before a tag exists:
+#
+#   1. two builds of one commit are byte-identical, on two runner images;
+#   2. the binaries are stamped from ldflags, not from the fallbacks;
+#   3. every archive carries an SBOM that lists what ships and not the
+#      test-only modules;
+#   4. signing works, exercised with a throwaway key so the step is proved
+#      without consuming a real identity or writing to the transparency log.
+#
+# Keyless signing belongs to the release workflow, where the OIDC identity is
+# the point; a snapshot build has no release identity to prove.
+name: snapshot
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          check-latest: true
+      - uses: anchore/sbom-action/download-syft@fffec3d851af758d56fee099cf3fbf8aa8779843 # v0.24.3
+      - name: snapshot build
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          args: release --snapshot --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: publish the checksums for comparison
+        run: |
+          set -euo pipefail
+          cp dist/checksums.txt "checksums-${RUNNER_IMAGE}.txt"
+          cat "checksums-${RUNNER_IMAGE}.txt"
+        env:
+          RUNNER_IMAGE: ${{ matrix.runner }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: checksums-${{ matrix.runner }}
+          path: checksums-*.txt
+          if-no-files-found: error
+          retention-days: 7
+      # The remaining checks run once, on the leg that has the artifacts in
+      # hand, so they are not repeated per runner.
+      - name: release-shaped build, SBOM and signature
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          set -euo pipefail
+
+          ./scripts/release-check.sh check dist
+
+          # A throwaway key proves the signing and verification path without a
+          # real identity: no Fulcio, no transparency-log entry.
+          cosign generate-key-pair
+          cosign sign-blob --yes --key cosign.key \
+            --output-signature dist/checksums.txt.sig \
+            dist/checksums.txt
+          cosign verify-blob --key cosign.pub \
+            --signature dist/checksums.txt.sig \
+            dist/checksums.txt
+          echo "== throwaway-key signature verifies against dist/checksums.txt"
+          rm -f cosign.key && echo "the throwaway private key is gone"
+      - name: keep the dist layout for review
+        if: matrix.runner == 'ubuntu-latest'
+        run: |
+          ls -l dist | head -30
+          for f in dist/*.tar.gz; do echo "--- $f"; tar tzf "$f"; done
+
+  reproducible:
+    name: compare the two images
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: checksums-*
+          path: artifacts
+      - name: compare
+        run: |
+          set -euo pipefail
+          first=$(find artifacts -name 'checksums-*' | head -n 1)
+          second=$(find artifacts -name 'checksums-*' | tail -n 1)
+          if [ "$first" = "$second" ]; then
+            echo "only one runner reported; the comparison needs two" >&2
+            exit 1
+          fi
+          if ! diff -u "$first" "$second"; then
+            echo "the two runner images produced different checksums; the build is not reproducible" >&2
+            exit 1
+          fi
+          echo "== checksums identical across $first and $second"
+          cat "$first"

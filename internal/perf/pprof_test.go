@@ -48,6 +48,7 @@ func TestProfileFullPass(t *testing.T) {
 	var dials atomic.Int64
 	runner := probe.New(&probe.Options{
 		Dialer:      countingDialer{dials: &dials},
+		Transport:   noTransport{},
 		Timeout:     time.Second,
 		Concurrency: 8,
 	})

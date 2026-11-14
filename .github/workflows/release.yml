@@ -1,0 +1,88 @@
+# Release: tag-triggered, keyless-signed, and a draft until a person publishes.
+#
+# Nothing runs without a pushed `v*` tag, and nothing is published by CI: the
+# release is created as a draft, so publishing is a human action. The
+# environment named here carries the required reviewer, which is the second
+# gate Evan asked for.
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  # Keyless signing: cosign exchanges this token for a short-lived Fulcio
+  # certificate tied to this workflow and ref, and records the signature in the
+  # transparency log. No private key exists to custody.
+  id-token: write
+
+jobs:
+  release:
+    name: draft release
+    # The only job with the environment, and the only one that can publish: the
+    # environment carries the required reviewer, and it accepts v* tags only.
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://github.com/Hedronite/simplex/releases
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          check-latest: true
+      - uses: anchore/sbom-action/download-syft@fffec3d851af758d56fee099cf3fbf8aa8779843 # v0.24.3
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: the tag and the toolchain must agree with the tree
+        run: |
+          set -euo pipefail
+          want=$(sed -n 's/^toolchain go\(.*\)$/\1/p' go.mod)
+          got=$(go version | awk '{print $3}' | sed 's/^go//')
+          if [ "$want" != "$got" ]; then
+            echo "go.mod names toolchain $want and this runner has $got" >&2
+            exit 1
+          fi
+          echo "== toolchain $got matches go.mod"
+      - name: build, check and draft the release
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: release-shaped build and SBOMs
+        run: ./scripts/release-check.sh check dist
+      - name: sign the checksums keylessly
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes \
+            --output-signature dist/checksums.txt.sig \
+            --output-certificate dist/checksums.txt.pem \
+            dist/checksums.txt
+      - name: verify with the identity this workflow just used
+        run: |
+          set -euo pipefail
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify-blob \
+            --certificate dist/checksums.txt.pem \
+            --signature dist/checksums.txt.sig \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" \
+            dist/checksums.txt
+          echo "== verified as $identity issued by $issuer"
+      - name: attach the signature to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/checksums.txt.sig dist/checksums.txt.pem --clobber
+          gh release view "${GITHUB_REF_NAME}" --json isDraft,assets \
+            --jq '{draft: .isDraft, assets: [.assets[].name]}'
