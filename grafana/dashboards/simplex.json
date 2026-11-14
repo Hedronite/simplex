@@ -12,7 +12,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "Worst severity of the last completed run. A held or expected-dark check never raises this.",
       "fieldConfig": {
@@ -88,7 +88,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_overall_severity",
           "instant": true,
@@ -102,7 +102,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "One-hot vantage status. Blind reads as cut off, not as a dead mesh: the vantage cannot see the tailnet, which says nothing about the mesh itself.",
       "fieldConfig": {
@@ -149,7 +149,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_vantage_status{status=\"blind\"} == 1",
           "instant": true,
@@ -159,7 +159,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_vantage_status{status=\"ok\"} == 1",
           "instant": true,
@@ -169,7 +169,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_vantage_status{status=\"unchecked\"} == 1",
           "instant": true,
@@ -183,7 +183,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "Age of the served document, computed at scrape, with the last run's wall-clock time beside it. Thresholds are multiples of the run interval: yellow at 3 x interval (90 s at the default 30 s), red at 20 x interval (600 s at the default 30 s). A wedged probe loop or a stalled serve shows as an aging document.",
       "fieldConfig": {
@@ -259,7 +259,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_document_age_seconds",
           "instant": true,
@@ -269,7 +269,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_last_run_timestamp_seconds * 1000",
           "instant": true,
@@ -283,7 +283,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "Per-host severity over time. A held or expected-dark check never raises its host.",
       "fieldConfig": {
@@ -356,7 +356,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_host_severity{host=~\"$host\"}",
           "legendFormat": "{{host}}",
@@ -369,7 +369,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "One row per check instance (host, kind, target). Severity colors the row; the result and reason one-hots are joined by label. Reason rows repeat the check for each carried code.",
       "fieldConfig": {
@@ -454,7 +454,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_check_severity{host=~\"$host\",kind=~\"$kind\"}",
           "instant": true,
@@ -464,7 +464,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_check_result{host=~\"$host\",kind=~\"$kind\"} == 1",
           "instant": true,
@@ -474,7 +474,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_check_reason{host=~\"$host\",kind=~\"$kind\"} == 1",
           "instant": true,
@@ -494,7 +494,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "How long a pass takes and how often one produces no document. A failing pass after startup is counted here, not fatal.",
       "fieldConfig": {
@@ -561,7 +561,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_run_duration_seconds",
           "legendFormat": "run duration",
@@ -570,7 +570,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "increase(simplex_run_errors_total[$__rate_interval])",
           "legendFormat": "run errors (increase)",
@@ -583,7 +583,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "lea-prom"
+        "uid": "${datasource}"
       },
       "description": "Which build of the binary this dashboard is looking at.",
       "fieldConfig": {
@@ -634,7 +634,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "lea-prom"
+            "uid": "${datasource}"
           },
           "expr": "simplex_build_info",
           "instant": true,
@@ -671,12 +671,28 @@
       {
         "current": {
           "selected": false,
+          "text": "default",
+          "value": "default"
+        },
+        "includeAll": false,
+        "label": "Prometheus",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
           "text": "All",
           "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "lea-prom"
+          "uid": "${datasource}"
         },
         "includeAll": true,
         "allValue": ".*",
@@ -698,7 +714,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "lea-prom"
+          "uid": "${datasource}"
         },
         "includeAll": true,
         "allValue": ".*",
