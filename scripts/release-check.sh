@@ -95,16 +95,17 @@ check_dist() {
 
 # --- compare -----------------------------------------------------------------
 
-# hashes prints the archive names and the checksums file, sorted, so two dist
-# directories can be compared without their paths in the way.
+# hashes prints the archive checksums, sorted. SBOMs are excluded on purpose:
+# syft stamps each document with a generation time and a document UUID, so two
+# runs never produce identical bytes even for identical input. What has to be
+# reproducible is what people download and verify, and that is the archive.
 hashes() {
 	dir=$1
 	[ -d "$dir" ] || fail "no dist directory at $dir"
 	(
 		cd "$dir" || exit 1
-		if [ -f checksums.txt ]; then
-			sort checksums.txt
-		fi
+		[ -f checksums.txt ] || fail "no checksums.txt in $dir"
+		grep -E '  [^ ]+\.tar\.gz$' checksums.txt | sort
 	)
 }
 
