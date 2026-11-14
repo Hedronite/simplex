@@ -12,9 +12,9 @@ acknowledgment and, as the fix progresses, updates in the advisory thread.
 
 ## Supported versions
 
-Simplex has no releases yet; only the current `main` branch is supported.
-Once tagged releases exist, this section lists the supported minor versions
-and states which get fixes.
+The current `main` branch is supported, and `0.1.0` is the first tagged
+release. This section lists the supported minor versions and states which get
+fixes as releases accumulate.
 
 ## Scope
 
@@ -47,6 +47,6 @@ Out of scope:
 
 ## Disclosure policy
 
-Confirmed issues get a fix on `main` and, after the first release, on all
+Confirmed issues get a fix on `main` and, once releases exist, on all
 supported versions. Advisories are published on this repository; reporters
 are credited in the advisory unless they prefer otherwise.

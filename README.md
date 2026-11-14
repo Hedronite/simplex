@@ -17,47 +17,21 @@ run.
 ## Position in the family
 
 ```
-Simplex (probe) ──simplex.probe/v0 + simplex_*──▶ Vigil (query surface) ──▶ Facet (client)
+Simplex (probe) ──simplex.probe/v0 + simplex_*──▶ a downstream query surface ──▶ a client
 ```
 
 Simplex computes per-check `result` and `severity` and the `overall` rollup.
-Vigil re-exposes it; it does not invent a second one. Alert-state rules (watch
-severities derived from Prometheus/Alertmanager alerts) live in a separate
-classifier, not here: Simplex reports only what it can observe itself.
+A downstream query surface re-exposes it; it does not invent a second one.
+Alert-state rules (watch severities derived from Prometheus/Alertmanager
+alerts) live in a separate classifier, not here: Simplex reports only what it
+can observe itself.
 
 ## Quickstart
 
 A run needs a public config (slugs only) and, for any check that needs an
-address, a private overlay file that is never committed. `example.yaml` in this
-repository is a complete public config:
-
-```console
-$ simplex check --config example.yaml
-$ simplex check --config example.yaml --json
-$ simplex validate --config example.yaml
-$ simplex serve --config example.yaml
-```
-
-`check` renders the table by default; `--json` prints the `simplex.probe/v0`
-document. Exit codes are identical in both modes. The table from a machine with
-no route to the mesh (a blind vantage, exit 5 — not a mesh failure):
-
-```console
-$ simplex check --config example.yaml
-HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
-edge    prom_up :9090/metrics        light     unknown  RED       vantage_blind
-lab  prom_up :9090/-/ready        light     unknown  RED       vantage_blind
-spoke  kube_apiserver :6443         dark      unknown  RED       vantage_blind
-spoke  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
-spoke  ts_reach :9100               light     unknown  RED       vantage_blind
-$ echo $?
-5
-```
-
-`validate` loads and checks the config and overlay without probing; it prints
-one finding per line, exits 0 with warnings and 3 with errors. On a clean
-checkout there is no private overlay to read, so the addresses are not checked
-and validate says so:
+address, a private overlay file that is never committed. `example.yaml` in
+this repository is a complete public config. `validate` is the first command
+to run: it needs no overlay and no network.
 
 ```console
 $ simplex validate --config example.yaml
@@ -66,8 +40,35 @@ $ echo $?
 0
 ```
 
-With an overlay present (never committed), the same command resolves every
-check against it and is quiet when the config is valid.
+Create the overlay (private, never committed) and `check` works. The table
+below comes from a machine with no tailnet address, so the vantage is blind —
+exit 5, which is "I am cut off", not a mesh failure:
+
+```console
+$ cat > simplex.overlay.yaml <<EOF
+apiVersion: simplex.overlay/v0
+hosts:
+  spoke:
+    address: spoke.invalid
+  edge:
+    address: edge.invalid
+  lab:
+    address: lab.invalid
+EOF
+$ simplex check --config example.yaml
+HOST   CHECK                        EXPECTED  RESULT   SEVERITY  REASONS
+edge   prom_up :9090/metrics        light     unknown  RED       vantage_blind
+lab    prom_up :9090/-/ready        light     unknown  RED       vantage_blind
+spoke  kube_apiserver :6443         dark      unknown  RED       vantage_blind
+spoke  node_exporter :9100/metrics  light     unknown  RED       vantage_blind
+spoke  ts_reach :9100               light     unknown  RED       vantage_blind
+$ echo $?
+5
+```
+
+With an overlay present and the addresses reachable, the same command reports
+the real verdicts. `--json` prints the `simplex.probe/v0` document instead;
+exit codes are identical in both modes.
 
 `version` prints one line, or a JSON object with `--json`:
 
@@ -78,35 +79,71 @@ $ simplex version --json
 {"version":"dev","commit":"unknown","built":"unknown"}
 ```
 
-- `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
-- Releases are produced with reproducible builds; until then, build from source
-  with Go 1.27 or newer.
+A source build prints the fallbacks above; a release build prints its version,
+commit and built date in the same shapes.
+
+`serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
+
+## Install and verify
+
+Releases are published as draft archives and cut by tag. Three targets ship:
+`linux/amd64`, `linux/arm64` and `darwin/arm64`, one archive each:
+
+```
+simplex_<version>_linux_amd64.tar.gz
+simplex_<version>_linux_arm64.tar.gz
+simplex_<version>_darwin_arm64.tar.gz
+```
+
+Each archive carries, at its root: the `simplex` binary, `LICENSE`, `README.md`,
+`CONTRIBUTING.md`, `SECURITY.md`, `example.yaml`, and the Grafana dashboard
+with its provider under `grafana/`.
+
+**Reproducibility:** archives and binaries are reproducible — two builds of
+one commit are byte-identical. SBOMs carry a generation time and UUID, so they
+are not byte-identical; everything else is.
+
+**Verify a download** (example shown for `v0.1.0`; the certificate identity is
+the release workflow path and the tag being verified):
+
+```sh
+cosign verify-blob \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-identity https://github.com/Hedronite/simplex/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+sha256sum --check --ignore-missing checksums.txt
+```
+
+`checksums.txt` carries one sha256 line per artifact, and the signature is a
+cosign keyless bundle (`checksums.txt.sigstore.json`) — there is no separate
+`.sig` or `.pem` file. Only the files present on disk are checked: the
+checksums file lists every shipped artifact, so a single-archive download
+checks its own line and that line must print OK. On macOS, where
+`sha256sum` is not part of the base system, the same check is:
+
+```sh
+shasum -a 256 --check --ignore-missing checksums.txt
+```
+
+Each archive also ships an SBOM beside it:
+`<archive name>.sbom.cdx.json`, CycloneDX JSON, listing the modules that ship
+in the binary.
+
+A release binary prints its tag as the version, with a 40-hex commit and a
+built date, in the same shapes as the source-build fallbacks above. The
+`dev`/`unknown` fallbacks only appear in a plain `go build`.
 
 ## The document
 
 A run produces one `simplex.probe/v0` document (see `docs/semantics.md` §9 for
 the full contract):
 
-```json
-{
-  "apiVersion": "simplex.probe/v0",
-  "generated_at": "2026-11-13T18:00:00Z",
-  "vantage": {"id": "lab", "status": "ok"},
-  "overall": "YELLOW",
-  "hosts": [
-    {"id": "edge", "severity": "YELLOW",
-     "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
-    {"id": "lab", "severity": "GREEN", "reasons": []}
-  ],
-  "checks": [
-    {"host": "edge", "kind": "prom_up", "target": ":9090/metrics", "result": "down",
-     "severity": "YELLOW", "expected": "light",
-     "reasons": ["http_unexpected_status", "prom_pair_degraded", "unexpected_dark"]},
-    {"host": "lab", "kind": "prom_up", "target": ":9090/-/ready", "result": "up",
-     "severity": "GREEN", "expected": "light", "reasons": []}
-  ]
-}
-```
+Captured documents live in the repository as fixtures:
+`testdata/green/document.json` is a complete GREEN run (every check answering,
+with the expected-dark `:6443` connect read as GREEN), and the fixture replay
+test reproduces every fixture byte for byte through the binary on each commit,
+so the documented shape and the shipped bytes cannot drift.
 
 Field names and the reason codes are frozen (16 at S0, five enrichment codes added at S3) (see §4 and §13 of
 `docs/semantics.md`); changes after S1 are breaking. The check kinds are an open
@@ -162,12 +199,57 @@ holds:                            # temporary announced darks; all fields requir
   missing slugs. Overlay files (`simplex.overlay.yaml`, `*.overlay.yaml`) are
   gitignored; never commit one.
 
+## Tailscale enrichment
+
+Optional, off by default, Linux unix socket only. A `ts_reach` connect says
+whether a port answered; the tailnet daemon on the vantage also knows whether
+the peer is online and whether traffic runs direct or through a relay.
+Enrichment reads that state and attaches it to the check as extra reason
+codes: `ts_peer_online`, `ts_peer_offline`, `ts_peer_unmatched`,
+`ts_path_direct` and `ts_path_relayed`.
+
+Turn it on in the config:
+
+```yaml
+tailscale:                   # optional, off by default
+  localapi: true             # required when the block is present
+  socket: /var/run/tailscale/tailscaled.sock   # optional, absolute path only
+```
+
+- **Informational only.** Enrichment never changes a `result`, a `severity`,
+  the rollup or the exit code. It explains an unexplained timeout; it does not
+  judge.
+- **Access limits.** One request per run: `GET /localapi/v0/status` with a
+  constant path and method, no body, over the configured unix socket. No
+  root, no capabilities, no `tailscale` command or any process execution, no
+  mutating call, and the socket file is never created or written. The request
+  times out in 2 s inside the pass deadline; the response is capped, decoded
+  into a minimal structure and reduced to booleans — no payload text reaches
+  an error or a log.
+- **A warning means** the daemon could not be read — socket missing,
+  unreadable, slow, oversize or malformed — once per run, by field path. The
+  run then behaves exactly as if enrichment were off.
+
+The full contract is `docs/semantics.md` §15.
+
+## Dashboard
+
+`grafana/dashboards/simplex.json` provisions one dashboard on an existing
+Grafana, and `grafana/provisioning/dashboards/simplex.yaml` is the file
+provider for it. How to install them, what each panel means, and how blind
+and stale read are in `docs/dashboard.md`.
+
+## Performance
+
+Benchmark, profile and soak results, and the gates they feed, are in
+`docs/performance.md`.
+
 ## Serve and metrics
 
 `simplex serve` probes on an interval and serves the latest result as
 Prometheus metrics on `GET /metrics`, loopback by default at
-`127.0.0.1:10081` (the `contract.MetricsListen` constant — `serve --help`
-quotes it from there). It binds loopback only; a non-loopback `--listen` is
+`127.0.0.1:10081` (the default `serve --help` quotes). It binds loopback
+only; a non-loopback `--listen` is
 refused unless `--unsafe-allow-non-loopback` is set, and then a warning is
 logged on every start: `/metrics` has no authentication.
 
@@ -238,8 +320,9 @@ The full series table, the one-hot rulings, the cold-start behavior and the
 cardinality formula are in `docs/metrics.md`.
 
 **Scope:** Simplex reports what it probes. There are no disk series — disk
-severity reaches the mesh summary through Cubit — and no alert-state series.
-Labels carry host slugs, check kinds and target forms only, never addresses.
+severity reaches the mesh summary through a companion collector — and no
+alert-state series. Labels carry host slugs, check kinds and target forms
+only, never addresses.
 
 **Deployment is a separate decision:** building `serve` is part of this
 repository; seating it on a mesh host and adding its scrape job to a
