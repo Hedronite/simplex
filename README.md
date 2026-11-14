@@ -90,9 +90,9 @@ Releases are published as draft archives and cut by tag. Three targets ship:
 `linux/amd64`, `linux/arm64` and `darwin/arm64`, one archive each:
 
 ```
-simplex_<version>_linux_amd64.tar.gz
-simplex_<version>_linux_arm64.tar.gz
-simplex_<version>_darwin_arm64.tar.gz
+simplex_0.1.1_linux_amd64.tar.gz
+simplex_0.1.1_linux_arm64.tar.gz
+simplex_0.1.1_darwin_arm64.tar.gz
 ```
 
 Each archive carries, at its root: the `simplex` binary, `LICENSE`, `README.md`,
@@ -103,13 +103,13 @@ with its provider under `grafana/`.
 one commit are byte-identical. SBOMs carry a generation time and UUID, so they
 are not byte-identical; everything else is.
 
-**Verify a download** (example shown for `v0.1.0`; the certificate identity is
+**Verify a download** (example shown for `v0.1.1`; the certificate identity is
 the release workflow path and the tag being verified):
 
 ```sh
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
-  --certificate-identity https://github.com/Hedronite/simplex/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-identity https://github.com/Hedronite/simplex/.github/workflows/release.yml@refs/tags/v0.1.1 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 sha256sum --check --ignore-missing checksums.txt

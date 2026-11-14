@@ -4,10 +4,20 @@ All notable changes to Simplex are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/); the project does not yet
 consider 1.0.0 reached, so breaking changes are called out explicitly.
 
+## [0.1.1]
+
+The first release with published binaries.
+
+### Fixed
+
+- The release tool now builds the pushed tag when a candidate tag shares the
+  commit: `v0.1.0` was tagged but never released as binaries, because the
+  build selected the candidate tag sharing its commit.
+
 ## [0.1.0]
 
-The first release: the probe, its document and metrics contracts, the CLI,
-and the release tooling.
+Tagged at `v0.1.0` and never published as binaries (see `0.1.1`). The probe,
+its document and metrics contracts, the CLI, and the release tooling.
 
 ### Added
 
@@ -45,4 +55,5 @@ and the release tooling.
   and is scrubbed in CI.
 - Loopback-only listeners by default; port 18080 is never dialed.
 
+[0.1.1]: https://github.com/Hedronite/simplex/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Hedronite/simplex/releases/tag/v0.1.0
