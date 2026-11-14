@@ -69,14 +69,17 @@ check_dist() {
 		grep -q '"bomFormat"' "$sbom" || fail "$sbom has no bomFormat"
 		grep -q 'CycloneDX' "$sbom" || fail "$sbom is not CycloneDX"
 	done
-	first=$(printf '%s\n' "$sboms" | head -n 1)
-	for shipped in spf13/cobra spf13/pflag go.yaml.in/yaml; do
-		grep -q "$shipped" "$first" || fail "SBOM does not list $shipped"
-	done
-	for testonly in santhosh-tekuri/jsonschema prometheus/client_golang prometheus/common client_model; do
-		if grep -q "$testonly" "$first"; then
-			fail "SBOM lists the test-only module $testonly"
-		fi
+	# Every SBOM is checked, not just the first: each archive ships with its
+	# own, and one wrong file is enough to mislead a reader.
+	for sbom in $sboms; do
+		for shipped in spf13/cobra spf13/pflag go.yaml.in/yaml; do
+			grep -q "$shipped" "$sbom" || fail "$sbom does not list $shipped"
+		done
+		for testonly in santhosh-tekuri/jsonschema prometheus/client_golang prometheus/common client_model; do
+			if grep -q "$testonly" "$sbom"; then
+				fail "$sbom lists the test-only module $testonly"
+			fi
+		done
 	done
 
 	note "archive contents"
@@ -105,7 +108,10 @@ hashes() {
 	(
 		cd "$dir" || exit 1
 		[ -f checksums.txt ] || fail "no checksums.txt in $dir"
-		grep -E '  [^ ]+\.tar\.gz$' checksums.txt | sort
+		archives=$(grep -E '  [^ ]+\.tar\.gz$' checksums.txt | sort) ||
+			fail "no archive checksums found in $dir/checksums.txt"
+		[ -n "$archives" ] || fail "no archive checksums found in $dir/checksums.txt"
+		printf '%s\n' "$archives"
 	)
 }
 

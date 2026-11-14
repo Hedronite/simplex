@@ -79,20 +79,38 @@ jobs:
             --certificate-oidc-issuer "$issuer" \
             dist/checksums.txt
           echo "== verified as $identity issued by $issuer"
+      - name: attach the signature bundle to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The archives goreleaser built are the bytes that were checked and
+          # signed, so only the bundle is added here: nothing already published
+          # is replaced after signing.
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/checksums.txt.sigstore.json --clobber
+          gh release view "${GITHUB_REF_NAME}" --json isDraft,assets \
+            --jq '{draft: .isDraft, assets: [.assets[].name]}'
       - name: remove the draft if a check failed
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # The draft is not public, and a failed check must not leave one
-          # behind for someone to publish by mistake.
-          gh release delete "${GITHUB_REF_NAME}" --yes --cleanup-tag=false || true
-      - name: attach the signature to the draft
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
           set -euo pipefail
-          gh release upload "${GITHUB_REF_NAME}" \
-            dist/checksums.txt.sigstore.json --clobber
-          gh release view "${GITHUB_REF_NAME}" --json isDraft,assets \
-            --jq '{draft: .isDraft, assets: [.assets[].name]}'
+          # gh release delete acts on any release for the tag, so the draft
+          # check comes first: a published release is never deleted here, and a
+          # failed check against a published tag fails loudly instead.
+          draft=$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq .isDraft 2>/dev/null || echo "absent")
+          case "$draft" in
+          true)
+            gh release delete "${GITHUB_REF_NAME}" --yes --cleanup-tag=false
+            echo "== removed the unpublished draft for ${GITHUB_REF_NAME}"
+            ;;
+          absent)
+            echo "no release for ${GITHUB_REF_NAME}; nothing to remove"
+            ;;
+          *)
+            echo "the release for ${GITHUB_REF_NAME} is not a draft (isDraft=$draft); refusing to delete it" >&2
+            exit 1
+            ;;
+          esac

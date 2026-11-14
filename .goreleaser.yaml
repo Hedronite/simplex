@@ -49,24 +49,31 @@ archives:
       - tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
-    # Every file carries the commit date as its mtime. Without this the
-    # archive inherits the checkout's timestamps, which differ between runners,
-    # and two builds of one commit stop being byte-identical.
+    # Ownership and time are fixed for every entry, the binary included. A tar
+    # header written from the filesystem carries the uid, gid and account names
+    # of whoever ran the build, so the same commit built by two accounts would
+    # produce two different archives; naming root here makes the header a
+    # constant instead.
+    builds_info:
+      owner: root
+      group: root
+      mode: 0755
+      mtime: '{{ .CommitDate }}'
     files:
       - src: LICENSE
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
       - src: README.md
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
       - src: CONTRIBUTING.md
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
       - src: SECURITY.md
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
       - src: example.yaml
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
       - src: grafana/dashboards/simplex.json
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
       - src: grafana/provisioning/dashboards/simplex.yaml
-        info: {mtime: '{{ .CommitDate }}'}
+        info: {owner: root, group: root, mode: 0644, mtime: '{{ .CommitDate }}'}
 
 checksum:
   name_template: checksums.txt
