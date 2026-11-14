@@ -84,6 +84,47 @@ commit and built date in the same shapes.
 
 `serve` re-runs the probe on an interval and exposes `/metrics` on loopback.
 
+## Install and verify
+
+Releases are published as draft archives and cut by tag. Three targets ship:
+`linux/amd64`, `linux/arm64` and `darwin/arm64`, one archive each:
+
+```
+simplex_<version>_linux_amd64.tar.gz
+simplex_<version>_linux_arm64.tar.gz
+simplex_<version>_darwin_arm64.tar.gz
+```
+
+Each archive carries, at its root: the `simplex` binary, `LICENSE`, `README.md`,
+`CONTRIBUTING.md`, `SECURITY.md`, `example.yaml`, and the Grafana dashboard
+with its provider under `grafana/`.
+
+**Reproducibility:** archives and binaries are reproducible — two builds of
+one commit are byte-identical. SBOMs carry a generation time and UUID, so they
+are not byte-identical; everything else is.
+
+**Verify a download** (example shown for `v0.1.0`; the certificate identity is
+the release workflow path and the tag being verified):
+
+```sh
+cosign verify-blob \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-identity https://github.com/Hedronite/simplex/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+sha256sum --check checksums.txt
+```
+
+`checksums.txt` carries one sha256 line per artifact, and the signature is a
+cosign keyless bundle (`checksums.txt.sigstore.json`) — there is no separate
+`.sig` or `.pem` file. Each archive also ships an SBOM beside it:
+`<archive name>.sbom.cdx.json`, CycloneDX JSON, listing the modules that ship
+in the binary.
+
+A release binary prints its tag as the version, with a 40-hex commit and a
+built date, in the same shapes as the source-build fallbacks above. The
+`dev`/`unknown` fallbacks only appear in a plain `go build`.
+
 ## The document
 
 A run produces one `simplex.probe/v0` document (see `docs/semantics.md` §9 for
