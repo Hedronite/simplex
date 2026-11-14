@@ -39,7 +39,7 @@ git init -q .
 # goreleaser parses the remote URL, so it has to name a real forge; nothing is
 # fetched or pushed, because every run here skips publish.
 git remote add origin "https://github.com/${GITHUB_REPOSITORY:-Hedronite/simplex}.git"
-git config user.email "release-check@example.invalid"
+git config user.email "release-check"
 git config user.name "release check"
 git -C "$origin" archive HEAD | tar -x -C .
 git add -A
@@ -68,6 +68,9 @@ GORELEASER_CURRENT_TAG="v$version" "$goreleaser" release --clean --skip=publish,
 if named_candidate; then fail "a run for v$version named an artifact after the candidate"; fi
 
 note "sorted, with nothing forced"
+# The value the workflow sets, repeated here so the sorted case is the one a
+# release without the forced tag would see.
+git config --global versionsort.suffix -rc.
 "$goreleaser" release --clean --skip=publish,sbom,sign >/dev/null
 [ "$(built_tag)" = "v$version" ] || fail "nothing forced, and the build carried $(built_tag)"
 if named_candidate; then fail "nothing forced, and an artifact was named after the candidate"; fi
