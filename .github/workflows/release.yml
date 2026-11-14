@@ -52,6 +52,14 @@ jobs:
       # publishes it. The checks below run against the artifacts it produced,
       # and a failure deletes the draft, so a bad build never waits for someone
       # to notice it.
+      - name: sort a prerelease below its final tag
+        # goreleaser chooses the tag with `git tag --points-at HEAD
+        # --sort=-version:refname`, and git only ranks `-rc.1` below `0.1.0`
+        # when it is told that `-rc.` marks a prerelease. A release candidate
+        # and the final tag normally sit on one commit, so without this the run
+        # for the final tag selects the candidate and releases it under the
+        # candidate's name. scripts/release-tag-check.sh keeps this honest.
+        run: git config --global versionsort.suffix -rc.
       - name: build and draft the release
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
@@ -60,6 +68,23 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          # The tag this run was started for, not whichever tag git happens to
+          # sort first: a release candidate and the final tag can share a commit.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
+      - name: the build must carry the pushed tag
+        # Nothing is signed or handed on from a build that named itself after
+        # the wrong tag. The artifacts already on the draft are the wrong ones,
+        # so this fails the run and the removal step at the end clears it.
+        run: |
+          set -euo pipefail
+          built=$(grep -o '"tag"[[:space:]]*:[[:space:]]*"[^"]*"' dist/metadata.json |
+            sed 's/.*"\([^"]*\)"$/\1/' | head -n 1)
+          [ -n "$built" ] || { echo "no tag in dist/metadata.json" >&2; exit 1; }
+          if [ "$built" != "${GITHUB_REF_NAME}" ]; then
+            echo "the build used ${built}, not the pushed tag ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+          echo "== built the pushed tag ${GITHUB_REF_NAME}"
       - name: release-shaped build and SBOMs
         run: ./scripts/release-check.sh check dist
       - name: sign the checksums keylessly

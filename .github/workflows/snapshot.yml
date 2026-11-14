@@ -94,6 +94,29 @@ jobs:
           ls -l dist | head -30
           for f in dist/*.tar.gz; do echo "--- $f"; tar tzf "$f"; done
 
+  tag-selection:
+    name: release tag selection
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: install goreleaser
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          install-only: true
+      # A release candidate and the final tag share a commit, which is how a run
+      # for the final tag once built the candidate's artifacts.
+      - name: a candidate and the final tag on one commit
+        run: ./scripts/release-tag-check.sh
+
   build-odd-uid:
     name: build (uid 12345)
     runs-on: ubuntu-latest
