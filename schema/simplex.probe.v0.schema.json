@@ -17,7 +17,7 @@
     },
     "observed": {
       "type": "boolean",
-      "description": "Whether at least one first-hand observation completed. When false, every check is unknown (for example, a blind vantage) and the document keeps its fail-closed severity (never GREEN)."
+      "description": "Whether at least one first-hand observation completed. When false, every check is unknown (for example, a blind vantage) and the document keeps its fail-closed severity (never GREEN). Exception: when the vantage is not blind and every check is unknown with a GREEN overall (all expected dark or held), observed is true, because the silence matched the expectation."
     },
     "valid_for": {
       "type": "integer",

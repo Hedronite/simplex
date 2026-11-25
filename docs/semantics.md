@@ -213,7 +213,7 @@ An override matches the host's check by `kind`, and by `target` when given; `por
 }
 ```
 
-`generated_at` is UTC, second precision, ending in `Z`. `--now` pins it and the hold clock together. `observed` is `false` when no first-hand observation occurred (every check is `unknown` and the document keeps its fail-closed non-GREEN severity, such as `YELLOW` with `probe_unknown` or `RED` with `vantage_blind`). `valid_for` is an integer count of seconds (`>= 1`) for which the producer stands behind the document (`2 * --interval` in `serve`, `--valid-for` in `check`, default `120`). `declaration` is copied verbatim from config (`^sha256:[0-9a-f]{64}$` or `null` when undeclared). Additive changes within `v0`; consumers refuse unknown majors via the required `apiVersion`.
+`generated_at` is UTC, second precision, ending in `Z`. `--now` pins it and the hold clock together. `observed` is `false` when no first-hand observation occurred (every check is `unknown` and the document keeps its fail-closed non-GREEN severity, such as `YELLOW` with `probe_unknown` or `RED` with `vantage_blind`). Expected silence is the exception: when the vantage is not blind and every check is `unknown` yet `overall` is `GREEN` (all expected dark or held), `observed` is `true`, because the silence matched the expectation. `valid_for` is an integer count of seconds (`>= 1`) for which the producer stands behind the document (`2 * --interval` in `serve`, `--valid-for` in `check`, default `120`). `declaration` is copied verbatim from config (`^sha256:[0-9a-f]{64}$` or `null` when undeclared). Additive changes within `v0`; consumers refuse unknown majors via the required `apiVersion`.
 
 ## 10. Exit codes
 
