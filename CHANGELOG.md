@@ -4,6 +4,32 @@ All notable changes to Simplex are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/); the project does not yet
 consider 1.0.0 reached, so breaking changes are called out explicitly.
 
+## [0.1.2]
+
+A consumer that validates documents or configs against a pinned copy of the
+schemas must refresh it before taking this release: the probe document has new
+fields.
+
+### Added
+
+- The `simplex.probe/v0` document carries `observed`, `valid_for` and
+  `declaration`. `observed` is `false` when no first-hand observation occurred
+  (a blind vantage, or every check `unknown` with a non-GREEN overall). A run
+  whose checks are all `unknown` but whose overall is GREEN (all expected dark
+  or held) counts as observed, because the silence was expected. `valid_for` is
+  whole seconds: `check --valid-for` (default 120), and in `serve` twice
+  `--interval`, rounded up.
+- `simplex.config/v0` takes an optional `declaration: sha256:<64 hex>` or
+  null. `simplex validate` checks it, and every document carries it.
+
+### Fixed
+
+- A pass cancelled by SIGTERM or SIGINT could overwrite the `--out` document
+  with the cancelled results. A cancelled pass is now discarded and the last
+  good file is kept byte for byte.
+- `serve --deadline` above 15s was cut short by the probe runner's own default.
+  The flag now applies to the runner.
+
 ## [0.1.1]
 
 The first release with published binaries.
@@ -55,5 +81,6 @@ its document and metrics contracts, the CLI, and the release tooling.
   and is scrubbed in CI.
 - Loopback-only listeners by default; port 18080 is never dialed.
 
+[0.1.2]: https://github.com/Hedronite/simplex/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Hedronite/simplex/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Hedronite/simplex/releases/tag/v0.1.0
