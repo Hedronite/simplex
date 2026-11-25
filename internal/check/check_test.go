@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"net"
+
+	"github.com/Hedronite/simplex/internal/contract"
 	"github.com/Hedronite/simplex/internal/probe"
 )
 
@@ -103,5 +106,80 @@ func TestMissingConfigIsARunErrorAndWarningsSurvive(t *testing.T) {
 	var re *RunError
 	if !errors.As(err, &re) || re.Source != "config" {
 		t.Fatalf("error %T %v", err, err)
+	}
+}
+
+type cancelWaitDialer struct {
+	entered chan struct{}
+	delay   time.Duration
+}
+
+func (d cancelWaitDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	if d.entered != nil {
+		select {
+		case d.entered <- struct{}{}:
+		default:
+		}
+	}
+	if d.delay > 0 {
+		select {
+		case <-time.After(d.delay):
+			c, peer := net.Pipe()
+			_ = peer.Close()
+			return c, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+type staticLister bool
+
+func (l staticLister) HasTailnetAddress() bool { return bool(l) }
+
+func TestRunCancelledMidProbeReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	cfg := write(t, dir, "c.yaml", goodConfig)
+	ov := write(t, dir, "o.txt", "apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: spoke.invalid\n")
+	entered := make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-entered
+		cancel()
+	}()
+	_, err := Run(ctx,
+		&Params{Config: cfg, Overlay: ov, Now: runNow},
+		&Deps{Runner: probe.New(&probe.Options{Dialer: cancelWaitDialer{entered: entered}}), Lister: staticLister(true), Getenv: func(string) string { return "" }})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+}
+
+func TestRunThreadsDeadlineIntoRunner(t *testing.T) {
+	dir := t.TempDir()
+	cfg := write(t, dir, "c.yaml", "apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: h1\n    checks:\n      - {kind: ts_reach, expected: light}\n  - id: h2\n    checks:\n      - {kind: ts_reach, expected: light}\n")
+	ov := write(t, dir, "o.txt", "apiVersion: simplex.overlay/v0\nhosts:\n  h1:\n    address: h1.invalid\n  h2:\n    address: h2.invalid\n")
+	base := probe.New(&probe.Options{
+		Dialer:      cancelWaitDialer{delay: 60 * time.Millisecond},
+		Concurrency: 1,
+	})
+	d := &Deps{Runner: base, Lister: staticLister(true), Getenv: func(string) string { return "" }}
+
+	res, err := Run(context.Background(), &Params{Config: cfg, Overlay: ov, Now: runNow, Deadline: 250 * time.Millisecond}, d)
+	if err != nil {
+		t.Fatalf("250ms deadline failed: %v", err)
+	}
+	for i, c := range res.Doc.Checks {
+		if c.Result != contract.ResultUp {
+			t.Fatalf("check %d got %s, want up", i, c.Result)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+	if _, err := Run(ctx, &Params{Config: cfg, Overlay: ov, Now: runNow, Deadline: 80 * time.Millisecond}, d); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
 	}
 }

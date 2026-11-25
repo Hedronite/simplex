@@ -6,6 +6,7 @@ package document
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/Hedronite/simplex/internal/contract"
@@ -15,6 +16,9 @@ import (
 type Document struct {
 	APIVersion  string            `json:"apiVersion"`
 	GeneratedAt string            `json:"generated_at"`
+	Observed    bool              `json:"observed"`
+	ValidFor    int               `json:"valid_for"`
+	Declaration *string           `json:"declaration"`
 	Vantage     Vantage           `json:"vantage"`
 	Overall     contract.Severity `json:"overall"`
 	Hosts       []Host            `json:"hosts"`
@@ -52,6 +56,9 @@ func (d *Document) Encode() []byte {
 	b.WriteString("{\n")
 	b.WriteString("  \"apiVersion\": " + q(d.APIVersion) + ",\n")
 	b.WriteString("  \"generated_at\": " + q(d.GeneratedAt) + ",\n")
+	b.WriteString("  \"observed\": " + strconv.FormatBool(d.Observed) + ",\n")
+	b.WriteString("  \"valid_for\": " + strconv.Itoa(d.ValidFor) + ",\n")
+	b.WriteString("  \"declaration\": " + qPtr(d.Declaration) + ",\n")
 	b.WriteString("  \"vantage\": {\"id\": " + q(d.Vantage.ID) + ", \"status\": " + q(string(d.Vantage.Status)) + "},\n")
 	b.WriteString("  \"overall\": " + q(string(d.Overall)) + ",\n")
 	b.WriteString("  \"hosts\": [\n")
@@ -78,6 +85,13 @@ func sep(i, n int) string {
 		return ",\n"
 	}
 	return "\n"
+}
+
+func qPtr(s *string) string {
+	if s == nil {
+		return "null"
+	}
+	return q(*s)
 }
 
 // q quotes a string as JSON without HTML escaping.

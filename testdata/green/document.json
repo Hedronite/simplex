@@ -1,6 +1,9 @@
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
+  "observed": true,
+  "valid_for": 120,
+  "declaration": null,
   "vantage": {"id": "lab", "status": "ok"},
   "overall": "GREEN",
   "hosts": [

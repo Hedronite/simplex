@@ -387,3 +387,65 @@ func TestInvariantsOverRandomInputs(t *testing.T) {
 		}
 	}
 }
+
+func TestTestimonyHeaderAndObservedInvariant(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("0f", 32)
+	d, err := Evaluate(&Input{
+		Now:           fixtureNow,
+		ValidFor:      60,
+		Declaration:   &digest,
+		VantageID:     "lab",
+		VantageStatus: contract.VantageOK,
+		Checks: []Observation{
+			obs("h", contract.KindTSReach, contract.ExpectedLight, contract.ResultUp, contract.ReasonTCPConnectOK),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Observed || d.ValidFor != 60 || d.Declaration == nil || *d.Declaration != digest {
+		t.Fatalf("unexpected header: observed=%v valid_for=%d decl=%v", d.Observed, d.ValidFor, d.Declaration)
+	}
+	enc := string(d.Encode())
+	if !strings.Contains(enc, "\"valid_for\": 60,") || !strings.Contains(enc, "\"observed\": true,") {
+		t.Fatalf("encoded JSON did not emit expected integer valid_for / observed:\n%s", enc)
+	}
+
+	// All checks unknown on expected: light -> observed: false, YELLOW, probe_unknown.
+	unk := eval(t, contract.VantageOK, nil,
+		obs("h1", contract.KindTSReach, contract.ExpectedLight, contract.ResultUnknown, contract.ReasonTCPConnectTimeout),
+		obs("h2", contract.KindNodeExporter, contract.ExpectedLight, contract.ResultUnknown, contract.ReasonHTTPTimeout),
+	)
+	if unk.Observed {
+		t.Fatalf("expected observed=false when all checks unknown")
+	}
+	if unk.Overall != contract.SeverityYellow {
+		t.Fatalf("overall = %s, want YELLOW", unk.Overall)
+	}
+	if unk.ValidFor != contract.DefaultValidFor {
+		t.Fatalf("valid_for = %d, want default %d", unk.ValidFor, contract.DefaultValidFor)
+	}
+	if unk.Declaration != nil {
+		t.Fatalf("declaration = %v, want nil", unk.Declaration)
+	}
+
+	// Blind vantage -> observed: false, RED, vantage_blind.
+	blind := eval(t, contract.VantageBlind, nil,
+		obs("h1", contract.KindTSReach, contract.ExpectedLight, contract.ResultUp, contract.ReasonTCPConnectOK),
+	)
+	if blind.Observed || blind.Overall != contract.SeverityRed {
+		t.Fatalf("blind: observed=%v overall=%s", blind.Observed, blind.Overall)
+	}
+
+	// Invariant: observed=false must never carry overall GREEN.
+	for _, status := range contract.VantageStatuses {
+		for _, exp := range contract.ExpectedValues {
+			for _, res := range contract.Results {
+				doc := eval(t, status, nil, obs("h", contract.KindTSReach, exp, res, ""))
+				if !doc.Observed && doc.Overall == contract.SeverityGreen {
+					t.Fatalf("observed=false with GREEN overall: status=%s exp=%s res=%s", status, exp, res)
+				}
+			}
+		}
+	}
+}

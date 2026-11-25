@@ -15,6 +15,20 @@
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
       "description": "UTC, second precision, trailing Z."
     },
+    "observed": {
+      "type": "boolean",
+      "description": "Whether at least one first-hand observation completed. When false, every check is unknown (for example, a blind vantage) and the document keeps its fail-closed severity (never GREEN). Exception: when the vantage is not blind and every check is unknown with a GREEN overall (all expected dark or held), observed is true, because the silence matched the expectation."
+    },
+    "valid_for": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "How long the producer stands behind the document, in integer seconds (>= 1)."
+    },
+    "declaration": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 digest of the canonical watch declaration, or null when undeclared."
+    },
     "vantage": {
       "type": "object",
       "additionalProperties": false,

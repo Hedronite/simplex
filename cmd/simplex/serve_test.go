@@ -11,8 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/Hedronite/simplex/internal/probe"
 
 	"github.com/Hedronite/simplex/internal/contract"
 	"github.com/Hedronite/simplex/internal/document"
@@ -521,4 +524,141 @@ func TestServeStopBeforeServeStartsReleasesThePort(t *testing.T) {
 		t.Fatalf("the address is still held after serve returned: %v", err)
 	}
 	_ = ln.Close()
+}
+
+type firstOKThenBlockDialer struct{ n *atomic.Int32 }
+
+func (d firstOKThenBlockDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	if d.n.Add(1) == 1 {
+		c, peer := net.Pipe()
+		_ = peer.Close()
+		return c, nil
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestServeCancelledPassKeepsLastGoodOut(t *testing.T) {
+	cfg, ov := serveFiles(t, "spoke.invalid")
+	out := filepath.Join(t.TempDir(), "probe.json")
+	n := &atomic.Int32{}
+	deps := &Deps{
+		Runner: probe.New(&probe.Options{Dialer: firstOKThenBlockDialer{n: n}, Clock: instantClock{}}),
+		Lister: fakeLister(true),
+		Getenv: func(string) string { return "" },
+	}
+	sv := startServe(t, deps, "--config", cfg, "--overlay", ov, "--out", out, "--interval", "200ms", "--deadline", "150ms")
+	var good []byte
+	waitFor(t, "first good --out", func() bool {
+		b, err := os.ReadFile(out)
+		good = b
+		return err == nil && len(b) > 0
+	})
+	waitFor(t, "second pass in flight", func() bool { return n.Load() >= 2 })
+	time.Sleep(30 * time.Millisecond)
+	if code := sv.stop(t); code != 0 {
+		t.Fatalf("serve exited %d on stop", code)
+	}
+	after, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(good, after) {
+		t.Fatalf("cancelled pass overwrote --out\n--- good\n%s\n--- after\n%s", good, after)
+	}
+	if !strings.Contains(sv.stderr.String(), "run failed source=run") {
+		t.Fatalf("expected cancelled pass error log, got %q", sv.stderr.String())
+	}
+}
+
+type pacedDialer struct{ d time.Duration }
+
+func (p pacedDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	select {
+	case <-time.After(p.d):
+		c, peer := net.Pipe()
+		_ = peer.Close()
+		return c, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func TestServeThreadsDeadlineAboveFifteenSecondsAndEnforcesTimeout(t *testing.T) {
+	// Verify serve's runner deadline construction honors values > 15s (not capped at DefaultDeadline).
+	if got := realDeps().Runner.WithDeadline(20 * time.Second).Options().Deadline; got != 20*time.Second {
+		t.Fatalf("realDeps runner WithDeadline(20s) = %v, want 20s", got)
+	}
+
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "c.yaml")
+	ov := filepath.Join(dir, "o.txt")
+	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\nvantage:\n  id: lab\nhosts:\n  - id: h1\n    checks:\n      - {kind: ts_reach, expected: light}\n  - id: h2\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  h1:\n    address: h1.invalid\n  h2:\n    address: h2.invalid\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2 x 70ms sequential probes succeed when --deadline is 250ms.
+	outOK := filepath.Join(dir, "ok.json")
+	depsOK := &Deps{
+		Runner: probe.New(&probe.Options{Dialer: pacedDialer{d: 70 * time.Millisecond}, Clock: instantClock{}, Concurrency: 1}),
+		Lister: fakeLister(true),
+		Getenv: func(string) string { return "" },
+	}
+	sv := startServe(t, depsOK, "--config", cfg, "--overlay", ov, "--out", outOK, "--interval", "500ms", "--deadline", "250ms")
+	waitFor(t, "pass completed within 250ms deadline", func() bool {
+		_, err := os.Stat(outOK)
+		return err == nil
+	})
+	doc := mustDocument(t, outOK)
+	for i, c := range doc.Checks {
+		if c.Result != contract.ResultUp {
+			t.Fatalf("check %d = %s, want up", i, c.Result)
+		}
+	}
+	sv.stop(t)
+
+	// The same 2 x 70ms sequential probes exceed an 80ms --deadline and fail the pass.
+	outFail := filepath.Join(dir, "fail.json")
+	depsFail := &Deps{
+		Runner: probe.New(&probe.Options{Dialer: pacedDialer{d: 70 * time.Millisecond}, Clock: instantClock{}, Concurrency: 1}),
+		Lister: fakeLister(true),
+		Getenv: func(string) string { return "" },
+	}
+	sv2 := startServe(t, depsFail, "--config", cfg, "--overlay", ov, "--out", outFail, "--interval", "500ms", "--deadline", "80ms")
+	waitFor(t, "failed pass counted", func() bool {
+		_, _, b := sv2.get(t, http.MethodGet, "/metrics")
+		return strings.Contains(b, "simplex_run_errors_total 1")
+	})
+	sv2.stop(t)
+	if _, err := os.Stat(outFail); !os.IsNotExist(err) {
+		t.Fatalf("timed-out pass wrote --out: err=%v", err)
+	}
+}
+
+func TestServeEmitsValidForTwoTimesIntervalAndDeclaration(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("ef", 32)
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "c.yaml")
+	ov := filepath.Join(dir, "o.txt")
+	if err := os.WriteFile(cfg, []byte("apiVersion: simplex.config/v0\ndeclaration: "+digest+"\nvantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: "+sentinelAddr+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "probe.json")
+	sv := startServe(t, serveDeps(sentinelAddr, contract.ReasonTCPConnectOK),
+		"--config", cfg, "--overlay", ov, "--out", out, "--interval", "2s", "--deadline", "1s")
+	waitFor(t, "serve wrote --out", func() bool {
+		_, err := os.Stat(out)
+		return err == nil
+	})
+	sv.stop(t)
+	doc := mustDocument(t, out)
+	if !doc.Observed || doc.ValidFor != 4 || doc.Declaration == nil || *doc.Declaration != digest {
+		t.Fatalf("unexpected serve header: %+v", doc)
+	}
 }

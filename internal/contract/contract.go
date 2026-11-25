@@ -32,6 +32,10 @@ const MetricsListen = "127.0.0.1:10081"
 // DeniedPort is never dialed, at config load or in the dialer.
 const DeniedPort = 18080
 
+// DefaultValidFor is the default document validity lifetime in integer seconds
+// for one-shot check runs.
+const DefaultValidFor = 120
+
 // Kind is a check kind. The enum is open: adding a kind is a minor change.
 type Kind string
 

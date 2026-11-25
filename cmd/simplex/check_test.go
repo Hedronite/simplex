@@ -514,3 +514,134 @@ func fixtureLocalAPI(t *testing.T, doc *document.Document, ov *overlay.Overlay) 
 	t.Cleanup(func() { _ = srv.Close() })
 	return sock
 }
+
+type blockUntilCancelDialer struct{ started chan struct{} }
+
+func (d blockUntilCancelDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	select {
+	case d.started <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestCheckCancelledPreservesExistingOut(t *testing.T) {
+	cfg, ov := tinyFiles(t)
+	out := filepath.Join(t.TempDir(), "probe.json")
+	want := []byte("sentinel-last-good\n")
+	if err := os.WriteFile(out, want, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	started := make(chan struct{}, 1)
+	deps := &Deps{
+		Runner: probe.New(&probe.Options{Dialer: blockUntilCancelDialer{started: started}, Clock: instantClock{}}),
+		Lister: fakeLister(true),
+		Now:    time.Now,
+		Getenv: func(string) string { return "" },
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-started
+		cancel()
+	}()
+	var outb, errb bytes.Buffer
+	code := run(ctx, []string{"check", "--json", "--config", cfg, "--overlay", ov, "--out", out}, &outb, &errb, deps)
+	if code != exitcode.Runtime {
+		t.Fatalf("exit %d, want %d (stderr %q)", code, exitcode.Runtime, errb.String())
+	}
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("--out changed after cancel: got %q, want %q", got, want)
+	}
+}
+
+func TestCheckTestimonyHeader(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("cd", 32)
+	dir := t.TempDir()
+	cfgDecl := filepath.Join(dir, "decl.yaml")
+	cfgNull := filepath.Join(dir, "null.yaml")
+	ov := filepath.Join(dir, "o.txt")
+	body := func(decl string) string {
+		return "apiVersion: simplex.config/v0\n" + decl + "vantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"
+	}
+	if err := os.WriteFile(cfgDecl, []byte(body("declaration: "+digest+"\n")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfgNull, []byte(body("declaration: null\n")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ov, []byte("apiVersion: simplex.overlay/v0\nhosts:\n  spoke:\n    address: spoke.invalid\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Valid --valid-for and declaration.
+	r := invoke(t, upDeps(), "check", "--json", "--config", cfgDecl, "--overlay", ov, "--valid-for", "60", "--now", "2026-11-13T18:00:00Z")
+	if r.code != exitcode.Green {
+		t.Fatalf("exit %d: %s", r.code, r.stderr)
+	}
+	var doc document.Document
+	if err := json.Unmarshal([]byte(r.stdout), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if !doc.Observed || doc.ValidFor != 60 || doc.Declaration == nil || *doc.Declaration != digest {
+		t.Fatalf("unexpected doc header: %+v", doc)
+	}
+	if !strings.Contains(r.stdout, "\"valid_for\": 60,") {
+		t.Fatalf("expected integer literal valid_for in JSON:\n%s", r.stdout)
+	}
+
+	// Explicit null declaration in config -> declaration: null.
+	r = invoke(t, upDeps(), "check", "--json", "--config", cfgNull, "--overlay", ov, "--now", "2026-11-13T18:00:00Z")
+	if r.code != exitcode.Green {
+		t.Fatalf("exit %d: %s", r.code, r.stderr)
+	}
+	if !strings.Contains(r.stdout, "\"declaration\": null,") {
+		t.Fatalf("expected declaration: null in JSON:\n%s", r.stdout)
+	}
+
+	// All checks unknown (expected light) -> observed: false and YELLOW (never GREEN).
+	unkDeps := &Deps{
+		Runner: fakeRunner(map[string]plan{"spoke.invalid:9100": {kind: contract.KindTSReach, result: contract.ResultUnknown, outcome: contract.ReasonTCPConnectTimeout}}),
+		Lister: fakeLister(true),
+		Now:    time.Now,
+		Getenv: func(string) string { return "" },
+	}
+	r = invoke(t, unkDeps, "check", "--json", "--config", cfgDecl, "--overlay", ov, "--now", "2026-11-13T18:00:00Z")
+	if r.code != exitcode.Yellow {
+		t.Fatalf("exit %d, want YELLOW", r.code)
+	}
+	var unkDoc document.Document
+	if err := json.Unmarshal([]byte(r.stdout), &unkDoc); err != nil {
+		t.Fatal(err)
+	}
+	if unkDoc.Observed || unkDoc.Overall != contract.SeverityYellow {
+		t.Fatalf("expected observed=false YELLOW, got observed=%v overall=%s", unkDoc.Observed, unkDoc.Overall)
+	}
+
+	// Blind vantage -> observed: false and RED.
+	blindDeps := upDeps()
+	blindDeps.Lister = fakeLister(false)
+	r = invoke(t, blindDeps, "check", "--json", "--config", cfgDecl, "--overlay", ov, "--now", "2026-11-13T18:00:00Z")
+	if r.code != exitcode.Blind {
+		t.Fatalf("exit %d, want Blind (5)", r.code)
+	}
+	var blindDoc document.Document
+	if err := json.Unmarshal([]byte(r.stdout), &blindDoc); err != nil {
+		t.Fatal(err)
+	}
+	if blindDoc.Observed || blindDoc.Overall != contract.SeverityRed {
+		t.Fatalf("expected observed=false RED, got observed=%v overall=%s", blindDoc.Observed, blindDoc.Overall)
+	}
+
+	// Invalid --valid-for values rejected with exit 3.
+	for _, bad := range []string{"0", "-5", "60s", "1.5"} {
+		r := invoke(t, upDeps(), "check", "--json", "--config", cfgNull, "--overlay", ov, "--valid-for", bad)
+		if r.code != exitcode.Config {
+			t.Fatalf("--valid-for %q: exit %d, want 3", bad, r.code)
+		}
+	}
+}

@@ -169,6 +169,20 @@ func Default() *Runner {
 // defaults were applied.
 func (r *Runner) Options() Options { return *r.opts }
 
+// WithDeadline returns a copy of r whose overall pass deadline is d.
+// Values <= 0 leave r unchanged.
+func (r *Runner) WithDeadline(d time.Duration) *Runner {
+	if r == nil {
+		return New(&Options{Deadline: d})
+	}
+	if d <= 0 {
+		return r
+	}
+	opts := *r.opts
+	opts.Deadline = d
+	return New(&opts)
+}
+
 // Run probes every instance and returns one Observation per instance, in the
 // order the instances arrived. Results are written into a pre-indexed slice,
 // so no lock and no map ordering reaches the caller.

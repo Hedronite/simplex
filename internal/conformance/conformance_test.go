@@ -243,6 +243,72 @@ var negativeCases = []struct {
   "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
               "severity": "GREEN", "expected": "light", "reasons": []}]
 }`},
+	{"probe", "observed_not_boolean", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "observed": "true",
+  "valid_for": 120,
+  "declaration": null,
+  "vantage": {"id": "lab", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
+              "severity": "GREEN", "expected": "light", "reasons": []}]
+}`},
+	{"probe", "valid_for_zero", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "observed": true,
+  "valid_for": 0,
+  "declaration": null,
+  "vantage": {"id": "lab", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
+              "severity": "GREEN", "expected": "light", "reasons": []}]
+}`},
+	{"probe", "valid_for_duration_string", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "observed": true,
+  "valid_for": "120s",
+  "declaration": null,
+  "vantage": {"id": "lab", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
+              "severity": "GREEN", "expected": "light", "reasons": []}]
+}`},
+	{"probe", "valid_for_float", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "observed": true,
+  "valid_for": 120.5,
+  "declaration": null,
+  "vantage": {"id": "lab", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
+              "severity": "GREEN", "expected": "light", "reasons": []}]
+}`},
+	{"probe", "declaration_bad_pattern", `{
+  "apiVersion": "simplex.probe/v0",
+  "generated_at": "2026-11-13T18:00:00Z",
+  "observed": true,
+  "valid_for": 120,
+  "declaration": "sha256:nothex",
+  "vantage": {"id": "lab", "status": "ok"},
+  "overall": "GREEN",
+  "hosts": [{"id": "spoke", "severity": "GREEN", "reasons": []}],
+  "checks": [{"host": "spoke", "kind": "ts_reach", "target": ":9100", "result": "up",
+              "severity": "GREEN", "expected": "light", "reasons": []}]
+}`},
+	{"config", "declaration_bad_pattern", `{
+  "apiVersion": "simplex.config/v0",
+  "declaration": "sha256:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+  "vantage": {"id": "lab"},
+  "hosts": [{"id": "spoke", "checks": [{"kind": "ts_reach", "expected": "light"}]}]
+}`},
 	{"probe", "empty_checks", `{
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",

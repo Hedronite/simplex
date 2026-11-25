@@ -272,3 +272,31 @@ func TestValidateBadClockExitsThree(t *testing.T) {
 		t.Fatalf("exit %d, want 3 (stderr %q)", r.code, r.stderr)
 	}
 }
+
+func TestValidateDeclaration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	digest := "sha256:" + strings.Repeat("ab", 32)
+	writeCfg := func(line string) string {
+		p := filepath.Join(t.TempDir(), "c.yaml")
+		if err := os.WriteFile(p, []byte("apiVersion: simplex.config/v0\n"+line+"vantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	for _, tc := range []struct {
+		name string
+		line string
+		code int
+	}{
+		{"valid digest", "declaration: " + digest + "\n", exitcode.Green},
+		{"null", "declaration: null\n", exitcode.Green},
+		{"invalid digest", "declaration: sha256:bad\n", exitcode.Config},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := invoke(t, upDeps(), "validate", "--json", "--config", writeCfg(tc.line), "--now", "2026-11-13T18:00:00Z")
+			if r.code != tc.code {
+				t.Fatalf("exit %d, want %d (stdout %q stderr %q)", r.code, tc.code, r.stdout, r.stderr)
+			}
+		})
+	}
+}
