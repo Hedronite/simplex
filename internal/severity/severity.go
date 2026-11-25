@@ -43,6 +43,8 @@ type Observation struct {
 // Input is everything the engine needs. Now is the single run clock.
 type Input struct {
 	Now           time.Time
+	ValidFor      int
+	Declaration   *string
 	VantageID     string
 	VantageStatus contract.VantageStatus
 	Checks        []Observation
@@ -139,9 +141,30 @@ func Evaluate(in *Input) (document.Document, error) {
 	for _, h := range hosts {
 		overall = worse(overall, h.Severity)
 	}
+	allUnknown := true
+	for i := range checks {
+		if checks[i].Result != contract.ResultUnknown {
+			allUnknown = false
+			break
+		}
+	}
+	// observed: false means no first-hand observation and is never GREEN.
+	observed := !blind && (!allUnknown || overall == contract.SeverityGreen)
+	validFor := in.ValidFor
+	if validFor < 1 {
+		validFor = contract.DefaultValidFor
+	}
+	var decl *string
+	if in.Declaration != nil {
+		v := *in.Declaration
+		decl = &v
+	}
 	return document.Document{
 		APIVersion:  contract.ProbeAPIVersion,
 		GeneratedAt: in.Now.UTC().Truncate(time.Second).Format(time.RFC3339),
+		Observed:    observed,
+		ValidFor:    validFor,
+		Declaration: decl,
 		Vantage:     document.Vantage{ID: in.VantageID, Status: in.VantageStatus},
 		Overall:     overall,
 		Hosts:       hosts,

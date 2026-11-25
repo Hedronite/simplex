@@ -71,11 +71,12 @@ func (e *Error) Error() string {
 // their file order; sorting into document order happens later, in the
 // engine, per docs/semantics.md section 6.
 type Config struct {
-	APIVersion string
-	Vantage    Vantage
-	Hosts      []Host
-	Holds      []Hold
-	Tailscale  Tailscale
+	APIVersion  string
+	Declaration *string
+	Vantage     Vantage
+	Hosts       []Host
+	Holds       []Hold
+	Tailscale   Tailscale
 }
 
 // Tailscale is the optional LocalAPI enrichment block. The zero value means
@@ -249,6 +250,7 @@ func (cfg *Config) ActiveHolds() []Hold {
 }
 
 var slugPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+var declarationPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 var targetPattern = regexp.MustCompile(`^:[0-9]{1,5}(/[\x21-\x7e]*)?$`)
 
 // Load reads the config file at path and parses it. A file that cannot be
@@ -325,6 +327,8 @@ func parse(data []byte, now func() time.Time) (*Config, []Finding, error) {
 		switch name {
 		case "apiVersion":
 			cfg.APIVersion = parseString(val, name, errAt)
+		case "declaration":
+			cfg.Declaration = parseDeclaration(val, name, errAt)
 		case "vantage":
 			vantageNode, vantageKey = val, key.Line
 		case "hosts":
@@ -443,6 +447,25 @@ func nodeDesc(n *yaml.Node) string {
 // node is not a string. A YAML timestamp scalar counts as a string: the
 // schema sees it as the JSON string it round-trips to, and only the
 // RFC 3339 parses get kept.
+// parseDeclaration reads the optional top-level declaration digest. YAML null
+// and omitted values both map to nil (undeclared).
+func parseDeclaration(n *yaml.Node, path string, errAt errFunc) *string {
+	n = deref(n)
+	if n == nil || n.Tag == "!!null" {
+		return nil
+	}
+	if n.Tag != "!!str" {
+		errAt(path, n.Line, "want a string or null, got %s", nodeDesc(n))
+		return nil
+	}
+	if !declarationPattern.MatchString(n.Value) {
+		errAt(path, n.Line, "must match ^sha256:[0-9a-f]{64}$")
+		return nil
+	}
+	v := n.Value
+	return &v
+}
+
 func parseString(n *yaml.Node, path string, errAt errFunc) string {
 	n = deref(n)
 	if n == nil {

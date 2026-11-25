@@ -11,6 +11,7 @@ import (
 
 	"github.com/Hedronite/simplex/internal/check"
 	"github.com/Hedronite/simplex/internal/config"
+	"github.com/Hedronite/simplex/internal/contract"
 	"github.com/Hedronite/simplex/internal/failure"
 	"github.com/Hedronite/simplex/internal/outfile"
 	"github.com/Hedronite/simplex/internal/severity"
@@ -33,11 +34,12 @@ func resolveOverlayPath(flag string, getenv func(string) string) string {
 }
 
 type checkFlags struct {
-	config  string
-	overlay string
-	now     string
-	out     string
-	json    bool
+	config   string
+	overlay  string
+	now      string
+	out      string
+	json     bool
+	validFor int
 }
 
 func newCheck(deps *Deps) *cobra.Command {
@@ -62,23 +64,30 @@ document; exits 3 and 4 never do.`,
 	fl.StringVar(&f.now, "now", "", "pin the run clock (RFC 3339); generated_at and hold expiry use it")
 	fl.StringVar(&f.out, "out", "", "also write the document to this file (temp file, fsync, atomic rename)")
 	fl.BoolVar(&f.json, "json", false, "print the simplex.probe/v0 document")
+	fl.IntVar(&f.validFor, "valid-for", contract.DefaultValidFor, "how long this document remains valid, in integer seconds (>= 1)")
 	return cmd
 }
 
 func runCheck(ctx context.Context, f *checkFlags, deps *Deps, stdout, stderr io.Writer) error {
+	if f.validFor < 1 {
+		return failure.Config("check: --valid-for must be at least 1 second")
+	}
 	now, err := runClock(f.now, deps.Now)
 	if err != nil {
 		return err
 	}
 
 	res, err := check.Run(ctx,
-		&check.Params{Config: f.config, Overlay: f.overlay, Now: now},
+		&check.Params{Config: f.config, Overlay: f.overlay, Now: now, ValidFor: f.validFor},
 		&check.Deps{Runner: deps.Runner, Lister: deps.Lister, Getenv: deps.Getenv, TailscaleSocket: deps.TailscaleSocket})
 	for i := range res.Warnings {
 		_, _ = fmt.Fprintf(stderr, "warning: %s\n", describe(f.config, &res.Warnings[i]))
 	}
 	if err != nil {
 		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return failure.Runtime(err, "probe pass cancelled")
 	}
 
 	// The file is written first, so a failed write exits 4 with nothing on stdout.

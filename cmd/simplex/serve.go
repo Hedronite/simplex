@@ -118,10 +118,12 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 	}
 
 	// A bad config or overlay is a startup error: exit 3 before binding.
+	validFor := serveValidFor(f.interval)
 	params := func(now time.Time) *check.Params {
-		return &check.Params{Config: f.config, Overlay: f.overlay, Now: now}
+		return &check.Params{Config: f.config, Overlay: f.overlay, Now: now, ValidFor: validFor, Deadline: f.deadline}
 	}
-	cdeps := &check.Deps{Runner: deps.Runner, Lister: deps.Lister, Getenv: deps.Getenv, TailscaleSocket: deps.TailscaleSocket}
+	runner := deps.Runner.WithDeadline(f.deadline)
+	cdeps := &check.Deps{Runner: runner, Lister: deps.Lister, Getenv: deps.Getenv, TailscaleSocket: deps.TailscaleSocket}
 	startNow := now().UTC().Truncate(time.Second)
 	res, err := check.Prepare(params(startNow), cdeps)
 	logWarnings(logger, res.Warnings)
@@ -145,6 +147,9 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 		r, err := check.Run(rctx, params(started.UTC().Truncate(time.Second)), cdeps)
 		logWarnings(logger, r.Warnings)
 		if err != nil {
+			return nil, err
+		}
+		if err := rctx.Err(); err != nil {
 			return nil, err
 		}
 		if f.out != "" {
@@ -223,6 +228,16 @@ func runServe(ctx context.Context, f *serveFlags, deps *Deps, stderr io.Writer) 
 	_ = ln.Close()
 	logger.Printf("stopped")
 	return fatal
+}
+
+// serveValidFor returns 2 * interval rounded up to whole integer seconds (>= 1).
+func serveValidFor(interval time.Duration) int {
+	d := 2 * interval
+	secs := int((d + time.Second - 1) / time.Second)
+	if secs < 1 {
+		return 1
+	}
+	return secs
 }
 
 // startupFailure reports a startup error by field path only. serve runs under

@@ -517,3 +517,59 @@ func TestNodeExporterFailures(t *testing.T) {
 		}
 	})
 }
+
+type slowDialer struct{ d time.Duration }
+
+func (s slowDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	select {
+	case <-time.After(s.d):
+		c, peer := net.Pipe()
+		_ = peer.Close()
+		return c, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func TestRunnerWithDeadline(t *testing.T) {
+	base := New(&Options{
+		Timeout:     5 * time.Second,
+		RetryDelay:  time.Millisecond,
+		Concurrency: 1,
+		Dialer:      slowDialer{d: 60 * time.Millisecond},
+		Clock:       SystemClock{},
+	})
+	over := base.WithDeadline(20 * time.Second)
+	got := over.Options()
+	if got.Deadline != 20*time.Second {
+		t.Fatalf("deadline = %v, want 20s", got.Deadline)
+	}
+	if got.Timeout != 5*time.Second || got.Concurrency != 1 || got.RetryDelay != time.Millisecond {
+		t.Fatalf("WithDeadline lost base options: %+v", got)
+	}
+	if base.WithDeadline(0).Options().Deadline != DefaultDeadline {
+		t.Fatalf("WithDeadline(0) altered base deadline")
+	}
+	if (*Runner)(nil).WithDeadline(20*time.Second).Options().Deadline != 20*time.Second {
+		t.Fatalf("nil Runner WithDeadline did not set 20s")
+	}
+
+	instances := []Instance{
+		{Host: "h1", Kind: contract.KindTSReach, Target: ":9100", Address: "h1.invalid", Port: 9100},
+		{Host: "h2", Kind: contract.KindTSReach, Target: ":9100", Address: "h2.invalid", Port: 9100},
+	}
+
+	// 2 x 60ms sequential probes succeed under a 250ms deadline.
+	okObs := base.WithDeadline(250*time.Millisecond).Run(context.Background(), instances)
+	for i, o := range okObs {
+		if o.Result != contract.ResultUp {
+			t.Fatalf("probe %d got %s, want up under 250ms deadline", i, o.Result)
+		}
+	}
+
+	// 2 x 60ms sequential probes exceed an 80ms deadline on the second probe.
+	timedOut := base.WithDeadline(80*time.Millisecond).Run(context.Background(), instances)
+	if timedOut[1].Result != contract.ResultUnknown {
+		t.Fatalf("probe 1 got %s, want unknown when 80ms deadline exceeded", timedOut[1].Result)
+	}
+}

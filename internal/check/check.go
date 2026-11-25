@@ -39,6 +39,11 @@ type Params struct {
 	Overlay string
 	// Now is the run clock: generated_at and hold expiry both use it.
 	Now time.Time
+	// ValidFor is the document validity lifetime in integer seconds (>= 1).
+	// Zero defaults to contract.DefaultValidFor.
+	ValidFor int
+	// Deadline overrides the probe runner pass deadline when > 0.
+	Deadline time.Duration
 }
 
 // Deps are the seams of a run. Only real ones are wired by the shipped binary.
@@ -140,13 +145,24 @@ func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
 		return res, err
 	}
 	cfg, resolved, instances := pre.cfg, pre.resolved, pre.instances
+	if err := ctx.Err(); err != nil {
+		return res, &RunError{Err: failure.Runtime(err, "probe pass cancelled"), Source: "run"}
+	}
+
+	runner := d.Runner
+	if p.Deadline > 0 {
+		runner = runner.WithDeadline(p.Deadline)
+	}
 
 	// The vantage is derived from the config's canaries; only the interface
 	// lister is a seam, so a test cannot inject a canary verdict.
 	status := vantage.New(vantage.Options{
 		Lister:   d.Lister,
-		Canaries: canaries(cfg, instances, d.Runner),
+		Canaries: canaries(cfg, instances, runner),
 	}).Status(ctx)
+	if err := ctx.Err(); err != nil {
+		return res, &RunError{Err: failure.Runtime(err, "probe pass cancelled"), Source: "run"}
+	}
 
 	// A blind vantage cannot trust anything it would see, so nothing is dialed.
 	observed := make([]probe.Observation, len(instances))
@@ -158,13 +174,25 @@ func Run(ctx context.Context, p *Params, d *Deps) (*Result, error) {
 			}
 		}
 	} else {
-		observed = d.Runner.Run(ctx, instances)
+		observed = runner.Run(ctx, instances)
+	}
+	if err := ctx.Err(); err != nil {
+		return res, &RunError{Err: failure.Runtime(err, "probe pass cancelled"), Source: "run"}
 	}
 
 	enrichment := enrich(ctx, cfg, instances, status, d.TailscaleSocket, res)
+	if err := ctx.Err(); err != nil {
+		return res, &RunError{Err: failure.Runtime(err, "probe pass cancelled"), Source: "run"}
+	}
 
+	validFor := p.ValidFor
+	if validFor < 1 {
+		validFor = contract.DefaultValidFor
+	}
 	in := severity.Input{
 		Now:           p.Now,
+		ValidFor:      validFor,
+		Declaration:   cfg.Declaration,
 		VantageID:     cfg.Vantage.ID,
 		VantageStatus: status,
 		Checks:        make([]severity.Observation, len(observed)),
@@ -296,7 +324,8 @@ func OverlayFailure(err error) error {
 
 // knownFields are the field names the config and overlay formats define.
 var knownFields = map[string]bool{
-	"apiVersion": true, "vantage": true, "id": true, "canaries": true,
+	"apiVersion": true, "declaration": true, "vantage": true, "id": true, "canaries": true,
+	"tailscale": true, "localapi": true, "socket": true,
 	"hosts": true, "checks": true, "holds": true, "host": true, "kind": true,
 	"target": true, "expected": true, "port": true, "path": true, "reason": true,
 	"until": true, "address": true, "lan_address": true, "overrides": true,

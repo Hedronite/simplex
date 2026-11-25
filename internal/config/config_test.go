@@ -498,3 +498,57 @@ func TestDeniedPortIsContractConstant(t *testing.T) {
 		t.Fatalf("denied port drifted: %d", contract.DeniedPort)
 	}
 }
+
+func TestDeclarationParsing(t *testing.T) {
+	validDigest := "sha256:" + strings.Repeat("a1", 32)
+	base := func(line string) []byte {
+		return []byte("apiVersion: simplex.config/v0\n" + line + "vantage:\n  id: lab\nhosts:\n  - id: spoke\n    checks:\n      - {kind: ts_reach, expected: light}\n")
+	}
+
+	cfg, findings, err := parse(base("declaration: "+validDigest+"\n"), fixtureClock(t))
+	if err != nil || len(findings) != 0 {
+		t.Fatalf("valid declaration rejected: err=%v findings=%+v", err, findings)
+	}
+	if cfg.Declaration == nil || *cfg.Declaration != validDigest {
+		t.Fatalf("got declaration %v, want %q", cfg.Declaration, validDigest)
+	}
+
+	for _, tc := range []struct {
+		name string
+		line string
+	}{
+		{"omitted", ""},
+		{"explicit null", "declaration: null\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, findings, err := parse(base(tc.line), fixtureClock(t))
+			if err != nil || len(findings) != 0 {
+				t.Fatalf("unexpected error: err=%v findings=%+v", err, findings)
+			}
+			if cfg.Declaration != nil {
+				t.Fatalf("got %q, want nil", *cfg.Declaration)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name string
+		line string
+	}{
+		{"short hex", "declaration: sha256:abcd\n"},
+		{"uppercase hex", "declaration: sha256:" + strings.Repeat("AB", 32) + "\n"},
+		{"wrong prefix", "declaration: md5:" + strings.Repeat("a", 32) + "\n"},
+		{"integer", "declaration: 123\n"},
+		{"boolean", "declaration: true\n"},
+	} {
+		t.Run("invalid "+tc.name, func(t *testing.T) {
+			_, findings, err := parse(base(tc.line), fixtureClock(t))
+			if err == nil {
+				t.Fatalf("expected error for %s, got findings=%+v", tc.name, findings)
+			}
+			if !hasFinding(findings, LevelError, "declaration") {
+				t.Fatalf("want finding on declaration, got %+v", findings)
+			}
+		})
+	}
+}

@@ -24,8 +24,11 @@ var fixtureNow = time.Date(2026, 11, 13, 18, 0, 0, 0, time.UTC)
 // strict in both directions, so a typo in a fixture is a test failure rather
 // than a silently ignored field.
 type document struct {
-	APIVersion  string `json:"apiVersion"`
-	GeneratedAt string `json:"generated_at"`
+	APIVersion  string  `json:"apiVersion"`
+	GeneratedAt string  `json:"generated_at"`
+	Observed    bool    `json:"observed"`
+	ValidFor    int     `json:"valid_for"`
+	Declaration *string `json:"declaration"`
 	Vantage     struct {
 		ID     string `json:"id"`
 		Status string `json:"status"`
@@ -52,8 +55,9 @@ type check struct {
 }
 
 type configFile struct {
-	APIVersion string `yaml:"apiVersion"`
-	Vantage    struct {
+	APIVersion  string  `yaml:"apiVersion"`
+	Declaration *string `yaml:"declaration"`
+	Vantage     struct {
 		ID       string `yaml:"id"`
 		Canaries []struct {
 			Host   string `yaml:"host"`
@@ -356,6 +360,12 @@ func TestFixtures(t *testing.T) {
 			}
 			if err := probeSchema.Validate(docAny); err != nil {
 				t.Fatalf("document.json does not validate against the probe schema: %v", err)
+			}
+			if doc.ValidFor < 1 {
+				t.Fatalf("document.json valid_for = %d, want >= 1", doc.ValidFor)
+			}
+			if !doc.Observed && doc.Overall == string(contract.SeverityGreen) {
+				t.Fatalf("document.json has observed=false with overall GREEN")
 			}
 
 			checkDocument(t, doc, cfg, ov)

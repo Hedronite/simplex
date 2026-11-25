@@ -164,6 +164,7 @@ tailscale:                   # optional, off by default (section 15)
 | Field | Required | Rule |
 | --- | --- | --- |
 | `apiVersion` | yes | `const simplex.config/v0` |
+| `declaration` | no | optional digest (`^sha256:[0-9a-f]{64}$`) or `null`; copied verbatim into emitted documents |
 | `vantage.id` | yes | slug |
 | `vantage.canaries` | no | check references; each names a configured `ts_reach` check |
 | `hosts[]` | yes, at least 1 | each `id` unique |
@@ -193,6 +194,9 @@ An override matches the host's check by `kind`, and by `target` when given; `por
 {
   "apiVersion": "simplex.probe/v0",
   "generated_at": "2026-11-13T18:00:00Z",
+  "observed": true,
+  "valid_for": 120,
+  "declaration": null,
   "vantage": {"id": "lab", "status": "ok"},
   "overall": "YELLOW",
   "hosts": [
@@ -209,7 +213,7 @@ An override matches the host's check by `kind`, and by `target` when given; `por
 }
 ```
 
-`generated_at` is UTC, second precision, ending in `Z`. `--now` pins it and the hold clock together. Additive changes within `v0`; consumers refuse unknown majors via the required `apiVersion`.
+`generated_at` is UTC, second precision, ending in `Z`. `--now` pins it and the hold clock together. `observed` is `false` when no first-hand observation occurred (every check is `unknown` and the document keeps its fail-closed non-GREEN severity, such as `YELLOW` with `probe_unknown` or `RED` with `vantage_blind`). `valid_for` is an integer count of seconds (`>= 1`) for which the producer stands behind the document (`2 * --interval` in `serve`, `--valid-for` in `check`, default `120`). `declaration` is copied verbatim from config (`^sha256:[0-9a-f]{64}$` or `null` when undeclared). Additive changes within `v0`; consumers refuse unknown majors via the required `apiVersion`.
 
 ## 10. Exit codes
 
@@ -259,6 +263,7 @@ S1 tests for `--out`: the temp file is in the target directory; the target is re
 | `--json` | `check`, `validate`, `version` | print the document, the findings JSON, or the JSON version object instead of the human form |
 | `--now RFC3339` | `check`, `validate` | pins `generated_at` and the hold clock together (section 11); used for reproducible fixtures |
 | `--out PATH` | `check`, `serve` | write the `--json` document to a file (section 11) |
+| `--valid-for N` | `check` | document validity lifetime in integer seconds (`>= 1`, default `120`) |
 
 Three overlay situations, per command:
 
